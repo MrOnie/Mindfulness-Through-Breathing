@@ -1,0 +1,5 @@
+# Archivos temporales de Python
+__pycache__/
+
+# Archivos de audio grandes que exceden los límites de GitHub
+uploads/*.wav
