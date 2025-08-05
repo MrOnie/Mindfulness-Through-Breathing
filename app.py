@@ -3,6 +3,7 @@ import os
 from werkzeug.utils import secure_filename
 from analisis_audio import perform_initial_analysis, analyze_respiration, build_respiratory_cycles_table, save_analysis_results
 from datetime import datetime
+from database import save_analysis_to_db, update_analysis_in_db
 
 app = Flask(__name__)
 
@@ -52,8 +53,14 @@ def index():
             # --- Save results ---
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
             session_folder = os.path.join(app.config['RESULTS_FOLDER'], f"{os.path.splitext(filename)[0]}_{timestamp}")
-            save_analysis_results(session_folder, analysis_data['events'], df_table, analysis_data)
             analysis_data['session_folder'] = session_folder # Pass to template
+
+            # Save to files (existing functionality)
+            save_analysis_results(session_folder, analysis_data['events'], df_table, analysis_data)
+
+            # Save to SQLite and get the new record's ID
+            db_id = save_analysis_to_db(analysis_data, df_table, respiration_analysis)
+            analysis_data['db_id'] = db_id # Add the ID to the data sent to the frontend
 
             return render_template('index.html', 
                                    filename=filename,
@@ -72,6 +79,7 @@ def recalculate_table():
     updated_events = data.get('events')
     analysis_data = data.get('analysis_data')
     session_folder = analysis_data.get('session_folder')
+    db_id = analysis_data.get('db_id') # Get the database ID
 
     if not updated_events or not session_folder:
         return jsonify({'error': 'Invalid data provided'}), 400
@@ -82,7 +90,11 @@ def recalculate_table():
     respiration_analysis = analyze_respiration(df_table)
 
     # --- Save updated results ---
+    # Save to files (existing functionality)
     save_analysis_results(session_folder, updated_events, df_table, analysis_data)
+    
+    # Update the record in SQLite
+    update_analysis_in_db(db_id, updated_events, df_table, respiration_analysis)
     
     return jsonify({
         'table_html': table_html, 

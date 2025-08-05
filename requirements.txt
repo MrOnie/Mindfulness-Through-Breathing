@@ -1,0 +1,6 @@
+flask
+werkzeug
+librosa
+pandas
+numpy
+matplotlib
