@@ -400,7 +400,7 @@ def save_analysis_results(output_dir, events, df_table, analysis_data):
             } for event in enriched_events
         ]
     }
-    json_path = os.path.join(output_dir, 'segmentation_data.json')
+    json_path = os.path.join(output_dir, 'final_analysis_report.json')
     with open(json_path, 'w') as f:
         json.dump(segmentation_data, f, indent=4)
 
