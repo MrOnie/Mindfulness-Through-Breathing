@@ -5207,10 +5207,22 @@
             "type": "apnea"
         },
         {
-            "id": 97,
+            "id": 38,
             "start": 385,
-            "end": 392,
+            "end": 389,
             "type": "exhalation"
+        },
+        {
+            "id": 78,
+            "start": 390,
+            "end": 390,
+            "type": "apnea"
+        },
+        {
+            "id": 15,
+            "start": 391,
+            "end": 392,
+            "type": "inhalation"
         },
         {
             "id": 79,
@@ -5222,7 +5234,7 @@
             "id": 39,
             "start": 402,
             "end": 405,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 80,
@@ -5234,7 +5246,7 @@
             "id": 16,
             "start": 411,
             "end": 416,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 81,
@@ -5246,7 +5258,7 @@
             "id": 40,
             "start": 424,
             "end": 426,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 82,
@@ -5258,7 +5270,7 @@
             "id": 17,
             "start": 430,
             "end": 437,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 83,
@@ -5270,7 +5282,7 @@
             "id": 41,
             "start": 447,
             "end": 450,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 84,
@@ -5282,7 +5294,7 @@
             "id": 18,
             "start": 458,
             "end": 463,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 85,
@@ -5294,7 +5306,7 @@
             "id": 42,
             "start": 483,
             "end": 486,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 86,
@@ -5306,7 +5318,7 @@
             "id": 19,
             "start": 489,
             "end": 494,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 87,
@@ -5318,7 +5330,7 @@
             "id": 43,
             "start": 505,
             "end": 508,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 88,
@@ -5330,7 +5342,7 @@
             "id": 20,
             "start": 523,
             "end": 529,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 89,
@@ -5342,7 +5354,7 @@
             "id": 44,
             "start": 533,
             "end": 537,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 90,
@@ -5354,7 +5366,7 @@
             "id": 21,
             "start": 547,
             "end": 554,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 91,
@@ -5366,7 +5378,7 @@
             "id": 45,
             "start": 564,
             "end": 567,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 92,
@@ -5378,7 +5390,7 @@
             "id": 22,
             "start": 575,
             "end": 582,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 93,
@@ -5390,7 +5402,7 @@
             "id": 46,
             "start": 593,
             "end": 596,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 94,
@@ -5402,7 +5414,7 @@
             "id": 23,
             "start": 600,
             "end": 600,
-            "type": "exhalation"
+            "type": "inhalation"
         },
         {
             "id": 95,
@@ -5414,7 +5426,7 @@
             "id": 47,
             "start": 602,
             "end": 606,
-            "type": "inhalation"
+            "type": "exhalation"
         },
         {
             "id": 96,
@@ -5593,7 +5605,7 @@
             "cycle_number": 24
         }
     ],
-    "session_folder": "results\\10-junio-4.14-am_20250821-075158",
-    "audio_filename": "10-junio-4.14-am.wav",
-    "db_id": 1
+    "db_id": 1,
+    "session_folder": "results\\Test1_10-junio-4.14-am_20250821-120438",
+    "audio_filename": "10-junio-4.14-am.wav"
 }

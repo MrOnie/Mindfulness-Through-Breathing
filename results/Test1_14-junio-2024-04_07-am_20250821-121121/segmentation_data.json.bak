@@ -4847,6 +4847,12 @@
     },
     "events": [
         {
+            "id": 40,
+            "start": 0,
+            "end": 2,
+            "type": "apnea"
+        },
+        {
             "id": 0,
             "start": 3,
             "end": 4,
@@ -5469,7 +5475,7 @@
             "cycle_number": 20
         }
     ],
-    "session_folder": "results\\14-junio-2024-04_07-am_20250821-075447",
+    "session_folder": "results\\Test1_14-junio-2024-04_07-am_20250821-121121",
     "audio_filename": "14-junio-2024-04_07-am.wav",
     "db_id": 3
 }

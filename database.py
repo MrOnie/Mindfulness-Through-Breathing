@@ -21,6 +21,7 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS analysis_sessions (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             filename TEXT NOT NULL,
+            participant_name TEXT,
             analysis_timestamp DATETIME NOT NULL,
             total_duration_seconds REAL NOT NULL,
             sampling_rate INTEGER NOT NULL,
@@ -30,12 +31,21 @@ def create_tables():
             segmentation_events_json TEXT
         );
     ''')
+    # Add participant_name column if it doesn't exist
+    cursor.execute('''
+        PRAGMA table_info(analysis_sessions);
+    ''')
+    columns = [col[1] for col in cursor.fetchall()]
+    if 'participant_name' not in columns:
+        cursor.execute('''
+            ALTER TABLE analysis_sessions ADD COLUMN participant_name TEXT;
+        ''')
     
     conn.commit()
     conn.close()
     print("Database tables checked/created successfully.")
 
-def save_analysis_to_db(session_folder_path, analysis_data, df_table, respiration_analysis):
+def save_analysis_to_db(session_folder_path, analysis_data, df_table, respiration_analysis, participant_name=None):
     """
     Saves the complete analysis result to the SQLite database.
     """
@@ -49,12 +59,13 @@ def save_analysis_to_db(session_folder_path, analysis_data, df_table, respiratio
     try:
         cursor.execute('''
             INSERT INTO analysis_sessions (
-                filename, analysis_timestamp, total_duration_seconds, sampling_rate, 
+                filename, participant_name, analysis_timestamp, total_duration_seconds, sampling_rate, 
                 session_folder, respiratory_cycles_json, respiration_analysis_json, segmentation_events_json
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             analysis_data.get("audio_filename"),
+            participant_name,
             datetime.now(),
             analysis_data.get("duration"),
             analysis_data.get("sampling_rate"),

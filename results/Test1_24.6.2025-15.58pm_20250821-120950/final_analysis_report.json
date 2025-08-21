@@ -193,15 +193,9 @@
         },
         {
             "start_time": 426.0,
-            "end_time": 436.0,
-            "label": "apnea",
-            "cycle_number": 8
-        },
-        {
-            "start_time": 437.0,
             "end_time": 437.0,
             "label": "apnea",
-            "cycle_number": null
+            "cycle_number": 8
         },
         {
             "start_time": 438.0,

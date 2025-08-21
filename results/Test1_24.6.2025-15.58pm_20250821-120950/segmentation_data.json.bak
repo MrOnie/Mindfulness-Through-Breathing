@@ -5074,12 +5074,6 @@
         {
             "id": 52,
             "start": 426,
-            "end": 436,
-            "type": "apnea"
-        },
-        {
-            "id": 43,
-            "start": 437,
             "end": 437,
             "type": "apnea"
         },
@@ -5153,6 +5147,30 @@
             "id": 49,
             "start": 571,
             "end": 580,
+            "type": "apnea"
+        },
+        {
+            "id": 12,
+            "start": 581,
+            "end": 588,
+            "type": "inhalation"
+        },
+        {
+            "id": 50,
+            "start": 589,
+            "end": 607,
+            "type": "apnea"
+        },
+        {
+            "id": 25,
+            "start": 608,
+            "end": 620,
+            "type": "exhalation"
+        },
+        {
+            "id": 51,
+            "start": 621,
+            "end": 621,
             "type": "apnea"
         }
     ],
@@ -5249,7 +5267,7 @@
             "cycle_number": 13
         }
     ],
-    "session_folder": "results\\24.6.2025-15.58pm_20250821-075533",
+    "session_folder": "results\\Test1_24.6.2025-15.58pm_20250821-120950",
     "audio_filename": "24.6.2025-15.58pm.wav",
-    "db_id": 4
+    "db_id": 2
 }

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
 import os
 import json
 import shutil
@@ -56,6 +56,14 @@ def _get_updated_data_response(analysis_data, db_id):
         'respiration_analysis': respiration_analysis
     })
 
+@app.route('/get_audio/<int:db_id>/<filename>')
+def get_audio(db_id, filename):
+    details = get_analysis_details(db_id)
+    if not details:
+        return "Audio not found", 404
+    session_folder = details['session_folder_path']
+    return send_from_directory(session_folder, filename)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -65,8 +73,9 @@ def index():
             
         if file and allowed_file(file.filename):
             filename = secure_filename(file.filename)
+            participant_name = secure_filename(request.form.get('participantName', 'unknown_participant'))
             timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-            session_folder_name = f"{os.path.splitext(filename)[0]}_{timestamp}"
+            session_folder_name = f"{participant_name}_{os.path.splitext(filename)[0]}_{timestamp}"
             session_folder_path = os.path.join(app.config['RESULTS_FOLDER'], session_folder_name)
             os.makedirs(session_folder_path, exist_ok=True)
 
@@ -87,7 +96,7 @@ def index():
             respiration_analysis = analyze_respiration(df_table)
             analysis_data['cycle_events'] = cycle_events
 
-            db_id = save_analysis_to_db(session_folder_path, analysis_data, df_table, respiration_analysis)
+            db_id = save_analysis_to_db(session_folder_path, analysis_data, df_table, respiration_analysis, participant_name)
             analysis_data['db_id'] = db_id
 
             with open(json_path, 'w') as f: json.dump(analysis_data, f, indent=4)
