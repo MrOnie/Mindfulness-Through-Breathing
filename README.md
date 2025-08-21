@@ -102,7 +102,7 @@ Below is an example of the analysis results from a session.
 **Segmentation Chart**
 
 *Note: The image path is an example and may vary based on the session.*
-![Segmentation Chart](results/24.6.2025-15.58pm_20250805-112710/segmentation_chart.png)
+![Segmentation Chart](results/Test1_24.6.2025-15.58pm_20250821-120950/segmentation_chart.png)
 
 **Respiratory Cycles Table**
 
