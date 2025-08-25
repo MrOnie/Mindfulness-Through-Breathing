@@ -268,30 +268,6 @@
             "end_time": 580.0,
             "label": "apnea",
             "cycle_number": 11
-        },
-        {
-            "start_time": 581.0,
-            "end_time": 588.0,
-            "label": "inhalation",
-            "cycle_number": 12
-        },
-        {
-            "start_time": 589.0,
-            "end_time": 607.0,
-            "label": "apnea",
-            "cycle_number": 12
-        },
-        {
-            "start_time": 608.0,
-            "end_time": 620.0,
-            "label": "exhalation",
-            "cycle_number": 12
-        },
-        {
-            "start_time": 621.0,
-            "end_time": 621.0,
-            "label": "apnea",
-            "cycle_number": 12
         }
     ]
 }

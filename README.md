@@ -7,6 +7,8 @@ All analysis results are saved persistently in a local SQLite database, allowing
 ## Key Features
 
 -   **Audio Upload:** Upload `.wav` audio files of breathing sessions.
+-   **Participant Tracking:** Mandatory input for participant name/code, used for organizing results folders and database records.
+-   **Audio Playback with Visual Sync:** Play uploaded audio with a synchronized vertical indicator bar on the respiratory phase chart.
 -   **Automatic Phase Detection:** The backend analyzes the audio to identify and segment inhalation, exhalation, and apnea phases.
 -   **Interactive Charting:**
     -   Visualizes the audio signal and an amplitude envelope plot where respiratory phases are clearly marked.
@@ -33,6 +35,7 @@ All analysis results are saved persistently in a local SQLite database, allowing
 
 2.  **Frontend (HTML, CSS, JavaScript):**
     -   **Dynamic Charts:** Uses `Chart.js` with the annotation plugin to create interactive visualizations.
+    -   **Audio Playback & Synchronization:** Integrates an audio player with a real-time vertical indicator on the charts, synchronized with audio playback.
     -   **AJAX for Real-Time Updates:** When a user modifies a phase, an asynchronous request is sent to the Flask backend.
     -   **Real-Time Recalculation:** The backend recalculates all metrics and database entries, returning the updated data to the frontend without a page reload.
 
@@ -99,7 +102,7 @@ Below is an example of the analysis results from a session.
 **Segmentation Chart**
 
 *Note: The image path is an example and may vary based on the session.*
-![Segmentation Chart](results/24.6.2025-15.58pm_20250805-112710/segmentation_chart.png)
+![Segmentation Chart](results/Test1_24.6.2025-15.58pm_20250821-120950/segmentation_chart.png)
 
 **Respiratory Cycles Table**
 
@@ -136,4 +139,16 @@ For each session, a `segmentation_data.json` file is also generated. This file i
         }
     ]
 }
+```
+
+##  Docker deployment
+
+A Docker image based on Python 3.13.5 was created that copies the Flask application code and its dependencies listed in requirements.txt. The container was configured to have Flask listen on all interfaces (0.0.0.0) allowing external access, and port 5000 was exposed to map it to the host. To run the container, use docker run -p 5000:5000 flask-audio-app , and it is recommended to add the --restart unless-stopped option so that the container restarts automatically when the machine boots.
+
+Run the container locally:
+```bash
+git clone https://github.com/MrOnie/Mindfulness-Through-Breathing.git
+git switch production
+docker build -t flask-audio-app .
+docker run -p 5000:5000 --restart unless-stopped flask-audio-app
 ```

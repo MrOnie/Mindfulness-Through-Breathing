@@ -6,12 +6,6 @@
     },
     "segmentation_events": [
         {
-            "start_time": 0.0,
-            "end_time": 2.0,
-            "label": "apnea",
-            "cycle_number": null
-        },
-        {
             "start_time": 3.0,
             "end_time": 4.0,
             "label": "inhalation",

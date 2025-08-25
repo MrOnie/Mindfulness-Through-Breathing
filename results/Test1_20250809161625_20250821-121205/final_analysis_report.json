@@ -1,0 +1,249 @@
+{
+    "audio_metadata": {
+        "original_filename": "20250809161625.WAV",
+        "total_duration_seconds": 635.776,
+        "sampling_rate": 16000
+    },
+    "segmentation_events": [
+        {
+            "start_time": 48.0,
+            "end_time": 52.0,
+            "label": "inhalation",
+            "cycle_number": 1
+        },
+        {
+            "start_time": 53.0,
+            "end_time": 74.0,
+            "label": "apnea",
+            "cycle_number": 1
+        },
+        {
+            "start_time": 75.0,
+            "end_time": 97.0,
+            "label": "exhalation",
+            "cycle_number": 1
+        },
+        {
+            "start_time": 98.0,
+            "end_time": 115.0,
+            "label": "apnea",
+            "cycle_number": 1
+        },
+        {
+            "start_time": 116.0,
+            "end_time": 120.0,
+            "label": "inhalation",
+            "cycle_number": 2
+        },
+        {
+            "start_time": 121.0,
+            "end_time": 141.0,
+            "label": "apnea",
+            "cycle_number": 2
+        },
+        {
+            "start_time": 142.0,
+            "end_time": 162.0,
+            "label": "exhalation",
+            "cycle_number": 2
+        },
+        {
+            "start_time": 163.0,
+            "end_time": 179.0,
+            "label": "apnea",
+            "cycle_number": 2
+        },
+        {
+            "start_time": 180.0,
+            "end_time": 184.0,
+            "label": "inhalation",
+            "cycle_number": 3
+        },
+        {
+            "start_time": 185.0,
+            "end_time": 206.0,
+            "label": "apnea",
+            "cycle_number": 3
+        },
+        {
+            "start_time": 207.0,
+            "end_time": 225.0,
+            "label": "exhalation",
+            "cycle_number": 3
+        },
+        {
+            "start_time": 226.0,
+            "end_time": 239.0,
+            "label": "apnea",
+            "cycle_number": 3
+        },
+        {
+            "start_time": 240.0,
+            "end_time": 244.0,
+            "label": "inhalation",
+            "cycle_number": 4
+        },
+        {
+            "start_time": 245.0,
+            "end_time": 261.0,
+            "label": "apnea",
+            "cycle_number": 4
+        },
+        {
+            "start_time": 262.0,
+            "end_time": 281.0,
+            "label": "exhalation",
+            "cycle_number": 4
+        },
+        {
+            "start_time": 282.0,
+            "end_time": 293.0,
+            "label": "apnea",
+            "cycle_number": 4
+        },
+        {
+            "start_time": 294.0,
+            "end_time": 298.0,
+            "label": "inhalation",
+            "cycle_number": 5
+        },
+        {
+            "start_time": 299.0,
+            "end_time": 316.0,
+            "label": "apnea",
+            "cycle_number": 5
+        },
+        {
+            "start_time": 317.0,
+            "end_time": 334.0,
+            "label": "exhalation",
+            "cycle_number": 5
+        },
+        {
+            "start_time": 335.0,
+            "end_time": 350.0,
+            "label": "apnea",
+            "cycle_number": 5
+        },
+        {
+            "start_time": 351.0,
+            "end_time": 355.0,
+            "label": "inhalation",
+            "cycle_number": 6
+        },
+        {
+            "start_time": 356.0,
+            "end_time": 372.0,
+            "label": "apnea",
+            "cycle_number": 6
+        },
+        {
+            "start_time": 373.0,
+            "end_time": 389.0,
+            "label": "exhalation",
+            "cycle_number": 6
+        },
+        {
+            "start_time": 390.0,
+            "end_time": 403.0,
+            "label": "apnea",
+            "cycle_number": 6
+        },
+        {
+            "start_time": 404.0,
+            "end_time": 407.0,
+            "label": "inhalation",
+            "cycle_number": 7
+        },
+        {
+            "start_time": 408.0,
+            "end_time": 426.0,
+            "label": "apnea",
+            "cycle_number": 7
+        },
+        {
+            "start_time": 427.0,
+            "end_time": 440.0,
+            "label": "exhalation",
+            "cycle_number": 7
+        },
+        {
+            "start_time": 441.0,
+            "end_time": 457.0,
+            "label": "apnea",
+            "cycle_number": 7
+        },
+        {
+            "start_time": 458.0,
+            "end_time": 462.0,
+            "label": "inhalation",
+            "cycle_number": 8
+        },
+        {
+            "start_time": 463.0,
+            "end_time": 483.0,
+            "label": "apnea",
+            "cycle_number": 8
+        },
+        {
+            "start_time": 484.0,
+            "end_time": 495.0,
+            "label": "exhalation",
+            "cycle_number": 8
+        },
+        {
+            "start_time": 496.0,
+            "end_time": 513.0,
+            "label": "apnea",
+            "cycle_number": 8
+        },
+        {
+            "start_time": 514.0,
+            "end_time": 518.0,
+            "label": "inhalation",
+            "cycle_number": 9
+        },
+        {
+            "start_time": 519.0,
+            "end_time": 541.0,
+            "label": "apnea",
+            "cycle_number": 9
+        },
+        {
+            "start_time": 542.0,
+            "end_time": 561.0,
+            "label": "exhalation",
+            "cycle_number": 9
+        },
+        {
+            "start_time": 562.0,
+            "end_time": 577.0,
+            "label": "apnea",
+            "cycle_number": 9
+        },
+        {
+            "start_time": 578.0,
+            "end_time": 582.0,
+            "label": "inhalation",
+            "cycle_number": 10
+        },
+        {
+            "start_time": 583.0,
+            "end_time": 608.0,
+            "label": "apnea",
+            "cycle_number": 10
+        },
+        {
+            "start_time": 609.0,
+            "end_time": 621.0,
+            "label": "exhalation",
+            "cycle_number": 10
+        },
+        {
+            "start_time": 622.0,
+            "end_time": 634.0,
+            "label": "apnea",
+            "cycle_number": 10
+        }
+    ]
+}

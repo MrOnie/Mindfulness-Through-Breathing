@@ -33,6 +33,10 @@
         <div class="card p-4 shadow-sm mb-5">
             <form method="post" enctype="multipart/form-data" id="upload-form">
                 <div class="form-group">
+                    <label for="participantName">Participant Name/Code:</label>
+                    <input type="text" class="form-control" id="participantName" name="participantName" placeholder="Enter participant name or code" required>
+                </div>
+                <div class="form-group">
                     <label for="audio_file">Select your audio file:</label>
                     <div class="custom-file">
                         <input type="file" class="custom-file-input" id="audio_file" name="audio_file" accept=".wav" required>
@@ -47,6 +51,14 @@
         {% if filename %}
         <div class="results mt-5">
             <h2 class="text-center mb-4">Results for: <strong>{{ filename }}</strong></h2>
+            {% if analysis_data %}
+            <div class="audio-player-container mb-4">
+                <audio id="audioPlayer" controls style="width: 100%;">
+                    <source src="{{ url_for('get_audio', db_id=analysis_data.db_id, filename=filename) }}" type="audio/wav">
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+            {% endif %}
 
             <!-- Charts and Controls -->
             <div class="card mb-4 shadow-sm">
@@ -55,8 +67,11 @@
                         <h3 class="mb-0">Audio Signal and Segmentation</h3>
                     </div>
                     <div>
-                        <button id="btn-unir" class="btn btn-success btn-sm" disabled title="Select 2 or more adjacent phases of the same type to merge">Merge Phases</button>
-                        <button id="btn-eliminar" class="btn btn-danger btn-sm" disabled title="Select one or more phases to delete">Delete Phase</button>
+                        <button id="recalculate-button" class="btn btn-info btn-sm" title="Run the initial analysis again">Recalculate</button>
+                        <button id="undo-button" class="btn btn-secondary btn-sm" disabled title="Undo the last action">Undo</button>
+                        <button id="merge-button" class="btn btn-success btn-sm" disabled title="Select a range of phases to merge">Merge Phases</button>
+                        <button id="delete-button" class="btn btn-danger btn-sm" disabled title="Select a range of phases to delete">Delete Phase</button>
+                        <button id="save-button" class="btn btn-primary btn-sm" title="Save final results (image, CSV, JSON)">Save Results</button>
                     </div>
                 </div>
                 <div id="collapseSignal" class="collapse show" aria-labelledby="headingSignal">
@@ -90,8 +105,7 @@
                                             <li><strong>Stability Score:</strong> {{ respiration_analysis.scores.Stability }} / 100</li>
                                             <li><strong>Internal Balance Score:</strong> {{ respiration_analysis.scores['Internal Balance'] }} / 100</li>
                                         </ul>
-                                        <h4><strong>Final Score:</strong> {{ respiration_analysis.scores.Final }} / 100</h4>
-                                        <hr>
+                                        <h4><strong>Final Score:</strong> {{ respiration_analysis.scores.Final }} / 100</h4><hr>
                                         <h5>Quick Diagnosis</h5>
                                         <p>The pillar with the most room for improvement is: <strong>{{ respiration_analysis.weakest_pillar }}</strong>.</p>
                                         <p><strong>Recommendation:</strong> {{ respiration_analysis.recommendation }}</p>
@@ -129,342 +143,12 @@
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
-    
+    {% if analysis_data %}
     <script>
-        $('.custom-file-input').on('change', function(event) {
-            var inputFile = event.currentTarget;
-            $(inputFile).parent().find('.custom-file-label').html(inputFile.files[0].name);
-        });
-
-        {% if analysis_data %}
-        document.addEventListener('DOMContentLoaded', function() {
-            const data = {{ analysis_data|tojson }};
-            let events = data.events;
-            const signal = data.signal;
-            const envelope = data.envelope;
-            
-            let selectedPhaseIds = new Set();
-            const btnMerge = document.getElementById('btn-unir');
-            const btnDelete = document.getElementById('btn-eliminar');
-
-            const phaseColors = {
-                'inhalation': 'rgba(75, 192, 192, 0.4)',
-                'exhalation': 'rgba(255, 206, 86, 0.4)',
-                'apnea': 'rgba(255, 99, 132, 0.4)'
-            };
-            const phaseBorderColors = {
-                'inhalation': 'rgb(75, 192, 192)',
-                'exhalation': 'rgb(255, 206, 86)',
-                'apnea': 'rgb(255, 99, 132)'
-            };
-            const selectedBorderColor = '#007bff';
-
-            function formatTime(seconds) {
-                const min = Math.floor(seconds / 60);
-                const sec = Math.floor(seconds % 60);
-                return `${min}:${sec.toString().padStart(2, '0')}`;
-            }
-
-            function createCustomLegend() {
-                const legendContainer = document.getElementById('legend-container');
-                legendContainer.innerHTML = '';
-                Object.keys(phaseColors).forEach(type => {
-                    const legendItem = document.createElement('div');
-                    legendItem.className = 'd-flex align-items-center mr-4';
-                    legendItem.innerHTML = `
-                        <div style="width: 20px; height: 20px; background-color: ${phaseColors[type]}; border: 1px solid ${phaseBorderColors[type]}; margin-right: 8px;"></div>
-                        <span>${type.charAt(0).toUpperCase() + type.slice(1)}</span>
-                    `;
-                    legendContainer.appendChild(legendItem);
-                });
-            }
-
-            const baseAxisOptions = {
-                type: 'linear',
-                position: 'bottom',
-                min: 0,
-                max: data.duration,
-                ticks: {
-                    stepSize: 30,
-                    callback: function(value) { return formatTime(value); }
-                }
-            };
-
-            const signalChart = new Chart(document.getElementById('signal-chart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Max Amplitude',
-                        data: signal.max.map((val, i) => ({ x: signal.t[i], y: val })),
-                        borderColor: 'rgba(128, 128, 128, 0.8)',
-                        backgroundColor: 'rgba(128, 128, 128, 0.8)',
-                        borderWidth: 1, pointRadius: 0, fill: 'origin'
-                    }, {
-                        label: 'Min Amplitude',
-                        data: signal.min.map((val, i) => ({ x: signal.t[i], y: val })),
-                        borderColor: 'rgba(128, 128, 128, 0.8)',
-                        backgroundColor: 'rgba(128, 128, 128, 0.8)',
-                        borderWidth: 1, pointRadius: 0, fill: 'origin'
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: {
-                        x: { ...baseAxisOptions, title: { display: false } },
-                        y: { 
-                            title: { display: false }, 
-                            min: -1, 
-                            max: 1,
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toFixed(2);
-                                }
-                            }
-                        }
-                    },
-                    plugins: { legend: { display: false } }
-                }
-            });
-
-            function createAnnotations(currentEvents, cycleEvents) {
-                const annotations = {};
-                let eventsToGraph = [...currentEvents];
-
-                const firstInhalationIndex = eventsToGraph.findIndex(e => e.type === 'inhalation');
-
-                if (firstInhalationIndex > 0) {
-                    eventsToGraph = eventsToGraph.slice(firstInhalationIndex);
-                } else if (firstInhalationIndex === -1) {
-                    eventsToGraph = [];
-                }
-
-                eventsToGraph.forEach(event => {
-                    annotations['box' + event.id] = {
-                        type: 'box', id: 'box' + event.id,
-                        xMin: event.start, xMax: event.end,
-                        yMin: envelope.negative_mean.reduce((a, b) => Math.min(a, b), 0) * 1.1,
-                        yMax: envelope.positive_mean.reduce((a, b) => Math.max(a, b), 0) * 1.1,
-                        backgroundColor: phaseColors[event.type],
-                        borderColor: selectedPhaseIds.has(event.id) ? selectedBorderColor : phaseBorderColors[event.type],
-                        borderWidth: selectedPhaseIds.has(event.id) ? 3 : 1,
-                        label: { content: event.type, enabled: true, position: "start" }
-                    };
-                });
-
-                if (cycleEvents) {
-                    cycleEvents.forEach(cycle => {
-                        annotations['label' + cycle.id] = {
-                            type: 'label',
-                            xValue: cycle.start,
-                            yValue: envelope.positive_mean.reduce((a, b) => Math.max(a, b), 0) * 0.9,
-                            content: [cycle.label],
-                            font: { size: 14, weight: 'bold' },
-                            color: 'black',
-                            xAdjust: 5,
-                            yAdjust: -10
-                        };
-                    });
-                }
-                return annotations;
-            }
-
-            const breathingChart = new Chart(document.getElementById('breathing-chart').getContext('2d'), {
-                type: 'line',
-                data: {
-                    datasets: [{
-                        label: 'Positive Envelope', 
-                        data: envelope.positive_mean.map((val, i) => ({ x: envelope.time[i], y: val })),
-                        borderColor: 'blue', borderWidth: 1.5, pointRadius: 0
-                    }, {
-                        label: 'Negative Envelope', 
-                        data: envelope.negative_mean.map((val, i) => ({ x: envelope.time[i], y: val })),
-                        borderColor: 'purple', borderWidth: 1.5, pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { 
-                        x: { ...baseAxisOptions, title: { display: true, text: 'Time (mm:ss)' } },
-                        y: { 
-                            title: { display: false },
-                            ticks: {
-                                callback: function(value) {
-                                    return value.toFixed(2);
-                                }
-                            }
-                        } 
-                    },
-                    plugins: {
-                        legend: { display: false },
-                        annotation: {
-                            drawTime: 'beforeDatasetsDraw',
-                            annotations: createAnnotations(events, data.cycle_events),
-                            enter: (ctx, event) => {
-                                if (ctx.element && ctx.element.options.type === 'box') { ctx.element.options.borderWidth = 3; ctx.chart.draw(); }
-                            },
-                            leave: (ctx, event) => {
-                                if (ctx.element && ctx.element.options.type === 'box') {
-                                    const eventId = parseInt(ctx.element.options.id.replace('box', ''), 10);
-                                    if (!selectedPhaseIds.has(eventId)) {
-                                        ctx.element.options.borderWidth = 1;
-                                    }
-                                    ctx.chart.draw();
-                                }
-                            },
-                            click: (ctx, event) => {
-                                if (ctx.element && ctx.element.options.type === 'box') {
-                                    const eventId = parseInt(ctx.element.options.id.replace('box', ''), 10);
-                                    if (isNaN(eventId)) return;
-                                    if (selectedPhaseIds.has(eventId)) selectedPhaseIds.delete(eventId); else selectedPhaseIds.add(eventId);
-                                    updateSelection();
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            createCustomLegend();
-
-            function updateButtonStates() {
-                const numSelected = selectedPhaseIds.size;
-                btnDelete.disabled = numSelected === 0;
-
-                if (numSelected < 2) {
-                    btnMerge.disabled = true;
-                    return;
-                }
-
-                // Ensure the main events array is sorted by start time.
-                events.sort((a, b) => a.start - b.start);
-
-                // Get the selected events in the order they appear in the main list.
-                const selectedSorted = events.filter(e => selectedPhaseIds.has(e.id));
-
-                // Find the indices of the first and last selected events in the main `events` array.
-                const firstIndex = events.findIndex(e => e.id === selectedSorted[0].id);
-                const lastIndex = events.findIndex(e => e.id === selectedSorted[selectedSorted.length - 1].id);
-
-                // Check if all events between the first and last are also selected.
-                let allIntermediateSelected = true;
-                for (let i = firstIndex; i <= lastIndex; i++) {
-                    if (!selectedPhaseIds.has(events[i].id)) {
-                        allIntermediateSelected = false;
-                        break;
-                    }
-                }
-                
-                // The button is enabled if the selected phases form a contiguous block.
-                // The type of the new merged phase will be determined by the first phase in the selection,
-                // which is handled by the 'btnMerge' click event listener.
-                btnMerge.disabled = !allIntermediateSelected;
-            }
-
-            function updateChart(updatedEvents, cycleEvents) {
-                breathingChart.options.plugins.annotation.annotations = createAnnotations(updatedEvents, cycleEvents);
-                breathingChart.update();
-                updateButtonStates();
-            }
-
-            function updateSelection() {
-                const annotations = breathingChart.options.plugins.annotation.annotations;
-                Object.values(annotations).forEach(ann => {
-                    if (ann.type === 'box') {
-                        const eventId = parseInt(ann.id.replace('box', ''), 10);
-                        ann.borderWidth = selectedPhaseIds.has(eventId) ? 3 : 1;
-                        ann.borderColor = selectedPhaseIds.has(eventId) ? selectedBorderColor : phaseBorderColors[events.find(e => e.id === eventId).type];
-                    }
-                });
-                breathingChart.update();
-                updateButtonStates();
-            }
-            
-            async function refreshTable() {
-                const payload = {
-                    events: events,
-                    analysis_data: data
-                };
-                const response = await fetch('/recalculate_table', { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify(payload) 
-                });
-                if (response.ok) {
-                    const responseData = await response.json();
-                    document.getElementById('tabla-ciclos-container').innerHTML = responseData.table_html;
-                    updateChart(events, responseData.cycle_events);
-                    
-                    // Update respiration analysis section
-                    const container = document.getElementById('analisis-respiracion-container');
-                    if (responseData.respiration_analysis) {
-                        container.innerHTML = `
-                            <p>Based on <strong>${responseData.respiration_analysis.num_cycles}</strong> respiratory cycles.</p>
-                            <ul>
-                                <li><strong>Depth Score:</strong> ${responseData.respiration_analysis.scores.Depth} / 100</li>
-                                <li><strong>Stability Score:</strong> ${responseData.respiration_analysis.scores.Stability} / 100</li>
-                                <li><strong>Internal Balance Score:</strong> ${responseData.respiration_analysis.scores['Internal Balance']} / 100</li>
-                            </ul>
-                            <h4><strong>Final Score:</strong> ${responseData.respiration_analysis.scores.Final} / 100</h4>
-                            <hr>
-                            <h5>Quick Diagnosis</h5>
-                            <p>The pillar with the most room for improvement is: <strong>${responseData.respiration_analysis.weakest_pillar}</strong>.</p>
-                            <p><strong>Recommendation:</strong> ${responseData.respiration_analysis.recommendation}</p>
-                        `;
-                    } else {
-                        container.innerHTML = '<p>No sufficient data to generate an analysis.</p>';
-                    }
-                } else {
-                    document.getElementById('tabla-ciclos-container').innerHTML = `<div class="alert alert-danger">Could not update table.</div>`;
-                }
-            }
-
-            function relabelSubsequentPhases(startIndex) {
-                if (startIndex >= events.length) return;
-                let alternator = true;
-                for (let i = startIndex - 1; i >= 0; i--) {
-                    if (events[i].type !== 'apnea') { alternator = events[i].type === 'exhalation'; break; }
-                }
-                for (let i = startIndex; i < events.length; i++) {
-                    if (events[i].type !== 'apnea') { events[i].type = alternator ? 'inhalation' : 'exhalation'; alternator = !alternator; }
-                }
-            }
-
-            btnDelete.addEventListener('click', () => {
-                if (selectedPhaseIds.size === 0) return;
-                let minIndex = events.length;
-                selectedPhaseIds.forEach(id => { minIndex = Math.min(minIndex, events.findIndex(e => e.id === id)); });
-                events = events.filter(e => !selectedPhaseIds.has(e.id));
-                if (minIndex < events.length) relabelSubsequentPhases(minIndex);
-                selectedPhaseIds.clear();
-                refreshTable();
-            });
-
-            btnMerge.addEventListener('click', () => {
-                if (selectedPhaseIds.size < 2) return;
-                const selected = events.filter(e => selectedPhaseIds.has(e.id)).sort((a, b) => a.start - b.start);
-                
-                const newEvent = { 
-                    id: Math.max(...events.map(e => e.id)) + 1,
-                    start: selected[0].start, 
-                    end: selected[selected.length - 1].end, 
-                    type: selected[0].type 
-                };
-                
-                events = events.filter(e => !selectedPhaseIds.has(e.id));
-                events.push(newEvent);
-                events.sort((a, b) => a.start - b.start);
-
-                const newIndex = events.findIndex(e => e.id === newEvent.id);
-                if (newIndex + 1 < events.length) {
-                    relabelSubsequentPhases(newIndex + 1);
-                }
-
-                selectedPhaseIds.clear();
-                selectedPhaseIds.add(newEvent.id);
-                refreshTable();
-            });
-        });
-        {% endif %}
+        const analysis_data = {{ analysis_data|tojson }};
     </script>
+    {% endif %}
+    
+    
 </body>
 </html>
