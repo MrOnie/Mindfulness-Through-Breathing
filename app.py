@@ -85,6 +85,8 @@ def index():
             analysis_data, error = perform_initial_analysis(audio_filepath)
             if error: return render_template('index.html', error=error)
             
+            # Store original events for comparison in export
+            analysis_data['original_events'] = analysis_data['events'].copy()
             analysis_data['session_folder'] = session_folder_path
             analysis_data['audio_filename'] = filename
 
@@ -109,6 +111,8 @@ def index():
 def save_results_endpoint():
     data = request.get_json()
     db_id = data.get('db_id')
+    export_format = data.get('export_format', 'all')  # Default to all formats
+    
     if not db_id:
         return jsonify({'success': False, 'error': 'Database ID is required'}), 400
 
@@ -126,10 +130,20 @@ def save_results_endpoint():
         events = analysis_data.get('events', [])
         df_table, _ = build_respiratory_cycles_table(events)
         
-        # Call the function from analisis_audio.py to save files
-        save_analysis_results(session_folder, events, df_table, analysis_data)
+        # Call the enhanced function from analisis_audio.py
+        save_analysis_results(session_folder, events, df_table, analysis_data, export_format)
         
-        return jsonify({'success': True, 'message': 'Results saved successfully!'})
+        # Create detailed success message based on export format
+        format_messages = {
+            'pdf': 'PDF report saved successfully!',
+            'png': 'PNG images saved successfully!', 
+            'csv': 'CSV data files saved successfully!',
+            'excel': 'Excel data files saved successfully!',
+            'all': 'All formats (PDF report, PNG images, CSV/Excel data) saved successfully!'
+        }
+        
+        message = format_messages.get(export_format, 'Results saved successfully!')
+        return jsonify({'success': True, 'message': message})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
@@ -147,6 +161,8 @@ def recalculate():
     analysis_data, error = perform_initial_analysis(audio_filepath)
     if error: return jsonify({'error': f'Recalculation failed: {error}'}), 500
 
+    # Store original events for comparison in export
+    analysis_data['original_events'] = analysis_data['events'].copy()
     analysis_data.update({'db_id': db_id, 'session_folder': session_folder, 'audio_filename': audio_filename})
     with open(json_path, 'w') as f: json.dump(analysis_data, f, indent=4)
     

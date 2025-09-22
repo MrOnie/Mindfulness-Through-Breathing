@@ -5,6 +5,7 @@ import os
 import json
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
+from matplotlib.backends.backend_pdf import PdfPages
 
 # --- CONFIGURATION CONSTANTS ---
 APNEA_THRESHOLD_FACTOR = 0.1
@@ -357,21 +358,34 @@ def calculate_waveshow_data(y, sr, num_vis_points=1000):
     
     return t_wave.tolist(), y_min.tolist(), y_max.tolist()
 
-def save_analysis_results(output_dir, events, df_table, analysis_data):
+def save_analysis_results(output_dir, events, df_table, analysis_data, export_format='all'):
     """
-    Saves the segmentation chart, cycles table, and segmentation data to the specified directory.
+    Saves comprehensive analysis results including original and adjusted spectrograms, 
+    detailed reports, and data tables in multiple formats.
 
     Args:
         output_dir (str): The directory to save the results.
-        events (list): The list of phase events.
+        events (list): The list of phase events (current/adjusted).
         df_table (pd.DataFrame): The respiratory cycles table.
         analysis_data (dict): The dictionary with all analysis data.
+        export_format (str): Export format - 'pdf', 'png', 'csv', 'excel', or 'all'.
     """
     os.makedirs(output_dir, exist_ok=True)
 
-    # --- Save Respiratory Cycles Table ---
-    table_path = os.path.join(output_dir, 'respiratory_cycles.csv')
-    df_table.to_csv(table_path, index=False)
+    # --- Save Respiratory Cycles Table in Multiple Formats ---
+    if export_format in ['csv', 'all']:
+        table_path = os.path.join(output_dir, 'respiratory_cycles.csv')
+        df_table.to_csv(table_path, index=False)
+    
+    if export_format in ['excel', 'all']:
+        try:
+            excel_path = os.path.join(output_dir, 'respiratory_cycles.xlsx')
+            df_table.to_excel(excel_path, index=False, sheet_name='Respiratory_Cycles')
+        except ImportError:
+            # Fallback to CSV if openpyxl is not available
+            if export_format == 'excel':
+                table_path = os.path.join(output_dir, 'respiratory_cycles.csv')
+                df_table.to_csv(table_path, index=False)
 
     # --- Enrich events with cycle number and save for ML ---
     _, cycle_events = build_respiratory_cycles_table(events)
@@ -400,52 +414,154 @@ def save_analysis_results(output_dir, events, df_table, analysis_data):
             } for event in enriched_events
         ]
     }
-    json_path = os.path.join(output_dir, 'final_analysis_report.json')
-    with open(json_path, 'w') as f:
-        json.dump(segmentation_data, f, indent=4)
-
-    # --- Generate and Save Segmentation Chart ---
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
     
-    # Plot 1: Audio Signal
-    ax1.fill_between(analysis_data['signal']['t'], analysis_data['signal']['min'], analysis_data['signal']['max'], color='gray', alpha=0.5)
-    ax1.set_ylabel('Amplitude')
-    ax1.set_title('Audio Signal and Segmentation')
-    ax1.grid(True)
+    if export_format in ['csv', 'excel', 'all']:
+        json_path = os.path.join(output_dir, 'final_analysis_report.json')
+        with open(json_path, 'w') as f:
+            json.dump(segmentation_data, f, indent=4)
 
-    # Plot 2: Breathing Envelope and Phases
-    ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['positive_mean'], label='Positive Envelope')
-    ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['negative_mean'], label='Negative Envelope')
-    ax2.set_xlabel('Time (s)')
-    ax2.set_ylabel('Mean Amplitude')
-    ax2.grid(True)
-
+    # Define phase colors for consistent visualization
     phase_colors = {
         'inhalation': 'green',
-        'exhalation': 'orange',
+        'exhalation': 'orange', 
         'apnea': 'red'
     }
 
-    for event in events:
-        ax2.add_patch(Rectangle((event['start'], ax2.get_ylim()[0]), event['end'] - event['start'], 
-                                ax2.get_ylim()[1] - ax2.get_ylim()[0], 
-                                color=phase_colors.get(event['type'], 'gray'), 
-                                alpha=0.3, label=f'{event["type"]} ({event["id"]})'))
-
-    # Add cycle numbers
-    for cycle in cycle_events:
-        ax2.text(cycle['start'], ax2.get_ylim()[1] * 0.9, f" {cycle['label']}", 
-                 color='blue', fontsize=12, ha='left', va='top', weight='bold')
-
-    # Create custom legend
-    handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
-    labels = phase_colors.keys()
-    ax2.legend(handles, labels, loc='lower right')
+    # --- Generate Original and Adjusted Spectrograms ---
+    original_events = analysis_data.get('original_events', events)  # Fallback to current if no original stored
     
-    plt.tight_layout()
-    chart_path = os.path.join(output_dir, 'segmentation_chart.png')
-    plt.savefig(chart_path)
-    plt.close(fig)
+    def create_spectrogram_plot(events_to_plot, title_suffix, ax1, ax2):
+        """Helper function to create consistent spectrogram plots"""
+        # Plot 1: Audio Signal
+        ax1.fill_between(analysis_data['signal']['t'], analysis_data['signal']['min'], 
+                        analysis_data['signal']['max'], color='gray', alpha=0.5, label='Audio Signal')
+        ax1.set_ylabel('Amplitude')
+        ax1.set_title(f'Audio Signal and Segmentation - {title_suffix}')
+        ax1.grid(True, alpha=0.3)
+        ax1.legend(loc='upper right')
+
+        # Plot 2: Breathing Envelope and Phases
+        ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['positive_mean'], 
+                label='Positive Envelope', color='blue', linewidth=1.5)
+        ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['negative_mean'], 
+                label='Negative Envelope', color='purple', linewidth=1.5)
+        ax2.set_xlabel('Time (s)')
+        ax2.set_ylabel('Mean Amplitude')
+        ax2.grid(True, alpha=0.3)
+
+        # Add phase rectangles
+        for event in events_to_plot:
+            ax2.add_patch(Rectangle((event['start'], ax2.get_ylim()[0]), 
+                                   event['end'] - event['start'], 
+                                   ax2.get_ylim()[1] - ax2.get_ylim()[0], 
+                                   color=phase_colors.get(event['type'], 'gray'), 
+                                   alpha=0.3))
+
+        # Add cycle numbers
+        _, temp_cycle_events = build_respiratory_cycles_table(events_to_plot)
+        for cycle in temp_cycle_events:
+            ax2.text(cycle['start'], ax2.get_ylim()[1] * 0.9, f" {cycle['label']}", 
+                    color='blue', fontsize=10, ha='left', va='top', weight='bold')
+
+        # Enhanced color legend
+        handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
+        labels = [f'{phase.title()} Phase' for phase in phase_colors.keys()]
+        ax2.legend(handles + [plt.Line2D([0], [0], color='blue', linewidth=1.5),
+                             plt.Line2D([0], [0], color='purple', linewidth=1.5)], 
+                  labels + ['Positive Envelope', 'Negative Envelope'], 
+                  loc='lower right', fontsize=9)
+
+    # --- Create Comprehensive PDF Report ---
+    if export_format in ['pdf', 'all']:
+        pdf_path = os.path.join(output_dir, 'comprehensive_breathing_analysis_report.pdf')
+        with PdfPages(pdf_path) as pdf:
+            # Page 1: Original Analysis
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+            create_spectrogram_plot(original_events, "Original Analysis", ax1, ax2)
+            plt.suptitle('Breathing Analysis Report - Original Detection', fontsize=16, fontweight='bold')
+            plt.tight_layout()
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
+
+            # Page 2: Adjusted Analysis (if different from original)
+            if original_events != events:
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+                create_spectrogram_plot(events, "Manually Adjusted", ax1, ax2)
+                plt.suptitle('Breathing Analysis Report - Manually Adjusted', fontsize=16, fontweight='bold')
+                plt.tight_layout()
+                pdf.savefig(fig, bbox_inches='tight')
+                plt.close(fig)
+
+            # Page 3: Data Summary
+            fig, ax = plt.subplots(figsize=(12, 8))
+            ax.axis('tight')
+            ax.axis('off')
+            
+            # Create table display
+            table_data = df_table.values
+            table_headers = df_table.columns.tolist()
+            
+            table = ax.table(cellText=table_data, colLabels=table_headers, 
+                           cellLoc='center', loc='center')
+            table.auto_set_font_size(False)
+            table.set_fontsize(9)
+            table.scale(1.2, 1.5)
+            
+            # Style the table
+            for i, header in enumerate(table_headers):
+                table[(0, i)].set_facecolor('#4CAF50')
+                table[(0, i)].set_text_props(weight='bold', color='white')
+            
+            plt.suptitle('Respiratory Cycles Summary Table', fontsize=16, fontweight='bold', y=0.95)
+            
+            # Add analysis summary text
+            summary_text = f"""
+Analysis Summary:
+• Total Duration: {analysis_data.get('duration', 0):.1f} seconds
+• Total Breathing Cycles: {len(cycle_events)}
+• Sampling Rate: {analysis_data.get('sampling_rate', 0)} Hz
+• File: {analysis_data.get('filename', 'unknown')}
+
+Phase Color Legend:
+• Green: Inhalation phases
+• Orange: Exhalation phases  
+• Red: Apnea (breath holding) phases
+            """
+            plt.figtext(0.02, 0.02, summary_text, fontsize=10, 
+                       bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.8))
+            
+            plt.tight_layout()
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
+
+    # --- Save Individual PNG Images ---
+    if export_format in ['png', 'all']:
+        # Original spectrogram
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+        create_spectrogram_plot(original_events, "Original Analysis", ax1, ax2)
+        plt.suptitle('Original Breathing Analysis', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        original_chart_path = os.path.join(output_dir, 'original_spectrogram.png')
+        plt.savefig(original_chart_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+        # Adjusted spectrogram (if different)
+        if original_events != events:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+            create_spectrogram_plot(events, "Manually Adjusted", ax1, ax2)
+            plt.suptitle('Adjusted Breathing Analysis', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            adjusted_chart_path = os.path.join(output_dir, 'adjusted_spectrogram.png')
+            plt.savefig(adjusted_chart_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+
+        # Legacy chart for compatibility
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+        create_spectrogram_plot(events, "Current Analysis", ax1, ax2)
+        plt.tight_layout()
+        chart_path = os.path.join(output_dir, 'segmentation_chart.png')
+        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
 def perform_initial_analysis(audio_file_path):
     """

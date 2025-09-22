@@ -220,13 +220,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 performAction('/recalculate', { db_id: dbId });
             }
         });
-        btnSave.addEventListener('click', async () => {
+        btnSave.addEventListener('click', (e) => {
+            e.preventDefault(); // Prevent default dropdown behavior
+        });
+        
+        // Enhanced Save Results with Export Format Options
+        async function saveResults(exportFormat) {
             loadingOverlay.style.display = 'flex';
             try {
                 const response = await fetch('/save_results', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ db_id: dbId })
+                    body: JSON.stringify({ 
+                        db_id: dbId,
+                        export_format: exportFormat 
+                    })
                 });
                 const responseData = await response.json();
                 if (response.ok && responseData.success) {
@@ -239,7 +247,68 @@ document.addEventListener('DOMContentLoaded', function() {
             } finally {
                 loadingOverlay.style.display = 'none';
             }
+        }
+
+        // Export format event listeners
+        document.getElementById('save-all').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('all');
         });
+        document.getElementById('save-pdf').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('pdf');
+        });
+        document.getElementById('save-png').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('png');
+        });
+        document.getElementById('save-csv').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('csv');
+        });
+        document.getElementById('save-excel').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('excel');
+        });
+
+        // Zoom functionality
+        let currentZoomLevel = 1;
+        const maxZoom = 10;
+        const minZoom = 0.1;
+        
+        function updateZoom(factor) {
+            currentZoomLevel *= factor;
+            currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
+            
+            // Apply zoom to both charts
+            [signalChart, breathingChart].forEach(chart => {
+                if (chart) {
+                    const duration = data.duration;
+                    const zoomedDuration = duration / currentZoomLevel;
+                    const center = chart.scales.x.min + (chart.scales.x.max - chart.scales.x.min) / 2;
+                    
+                    chart.options.scales.x.min = Math.max(0, center - zoomedDuration / 2);
+                    chart.options.scales.x.max = Math.min(duration, center + zoomedDuration / 2);
+                    chart.update('none');
+                }
+            });
+        }
+        
+        function resetZoom() {
+            currentZoomLevel = 1;
+            [signalChart, breathingChart].forEach(chart => {
+                if (chart) {
+                    chart.options.scales.x.min = 0;
+                    chart.options.scales.x.max = data.duration;
+                    chart.update('none');
+                }
+            });
+        }
+
+        // Zoom control event listeners
+        document.getElementById('zoom-in').addEventListener('click', () => updateZoom(1.5));
+        document.getElementById('zoom-out').addEventListener('click', () => updateZoom(0.67));
+        document.getElementById('zoom-reset').addEventListener('click', resetZoom);
 
         // --- Audio Playback and Visual Indicator ---
         if (audioPlayer) {
