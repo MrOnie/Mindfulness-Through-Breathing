@@ -4,3 +4,4 @@ __pycache__/
 # Archivos de audio grandes que exceden los límites de GitHub
 #uploads/*.wav
 *.wav
+results/
