@@ -220,27 +220,58 @@ document.addEventListener('DOMContentLoaded', function() {
                 performAction('/recalculate', { db_id: dbId });
             }
         });
-        btnSave.addEventListener('click', (e) => {
-            e.preventDefault(); // Prevent default dropdown behavior
-        });
         
-        // Enhanced Save Results with Export Format Options
+        /**
+         * Handles saving the results by fetching the file from the backend and
+         * triggering a download in the browser.
+         * @param {string} exportFormat The desired format ('pdf', 'csv', 'all', etc.).
+         */
         async function saveResults(exportFormat) {
             loadingOverlay.style.display = 'flex';
             try {
                 const response = await fetch('/save_results', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        db_id: dbId,
-                        export_format: exportFormat 
-                    })
+                    body: JSON.stringify({ db_id: dbId, export_format: exportFormat })
                 });
-                const responseData = await response.json();
-                if (response.ok && responseData.success) {
-                    alert(responseData.message);
+
+                const contentType = response.headers.get('content-type');
+
+                // If the server sends a JSON response, it's likely an error.
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    console.error("Server returned an error:", errorData); // Log the full error for debugging
+                    // Try to find a meaningful message, otherwise show the raw data.
+                    const errorMessage = errorData.error || errorData.message || `Unknown server error. Raw response: ${JSON.stringify(errorData)}`;
+                    alert(`Error: ${errorMessage}`);
+                } else if (response.ok) {
+                    // The response is a file.
+                    const blob = await response.blob();
+                    
+                    // Extract filename from the 'Content-Disposition' header.
+                    const disposition = response.headers.get('Content-Disposition');
+                    let filename = `results.${exportFormat}`; // Fallback filename
+                    if (disposition && disposition.includes('attachment')) {
+                        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            filename = filenameMatch[1];
+                        }
+                    }
+
+                    // Create a temporary link to trigger the download.
+                    const link = document.createElement('a');
+                    const url = window.URL.createObjectURL(blob);
+                    link.href = url;
+                    link.setAttribute('download', filename);
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    // Clean up the temporary link and URL object.
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
                 } else {
-                    alert(`Error: ${responseData.error || 'Unknown error'}`);
+                    // Handle other HTTP errors.
+                    alert(`An error occurred while generating the file. Status: ${response.status}`);
                 }
             } catch (error) {
                 alert(`An unexpected error occurred: ${error}`);

@@ -182,11 +182,11 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     {% if analysis_data %}
     <script>
-        const analysis_data = {{ analysis_data|tojson }};
+        var analysis_data = JSON.parse('{{ analysis_data|tojson | safe }}');
     </script>
     {% endif %}
     

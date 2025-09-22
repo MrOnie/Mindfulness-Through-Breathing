@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, jsonify, send_from_directory, send_file
 import os
 import json
 import shutil
@@ -112,7 +112,7 @@ def save_results_endpoint():
     data = request.get_json()
     db_id = data.get('db_id')
     export_format = data.get('export_format', 'all')  # Default to all formats
-    
+
     if not db_id:
         return jsonify({'success': False, 'error': 'Database ID is required'}), 400
 
@@ -120,30 +120,42 @@ def save_results_endpoint():
     if not details:
         return jsonify({'success': False, 'error': 'Analysis not found'}), 404
 
-    session_folder = details['session_folder_path']
-    json_path = os.path.join(session_folder, 'segmentation_data.json')
+    session_folder_path = details['session_folder_path']
+    participant_name = details.get('participant_name', 'participant')
+    json_path = os.path.join(session_folder_path, 'segmentation_data.json')
 
     try:
         with open(json_path, 'r') as f:
             analysis_data = json.load(f)
-        
+
         events = analysis_data.get('events', [])
         df_table, _ = build_respiratory_cycles_table(events)
-        
-        # Call the enhanced function from analisis_audio.py
-        save_analysis_results(session_folder, events, df_table, analysis_data, export_format)
-        
-        # Create detailed success message based on export format
-        format_messages = {
-            'pdf': 'PDF report saved successfully!',
-            'png': 'PNG images saved successfully!', 
-            'csv': 'CSV data files saved successfully!',
-            'excel': 'Excel data files saved successfully!',
-            'all': 'All formats (PDF report, PNG images, CSV/Excel data) saved successfully!'
+
+        # This function saves the file(s) to the server's disk.
+        save_analysis_results(session_folder_path, events, df_table, analysis_data, export_format)
+
+        # Now, instead of returning JSON, we send the generated file.
+        file_map = {
+            'pdf': 'comprehensive_breathing_analysis_report.pdf',
+            'csv': 'respiratory_cycles.csv',
+            'excel': 'respiratory_cycles.xlsx'
         }
-        
-        message = format_messages.get(export_format, 'Results saved successfully!')
-        return jsonify({'success': True, 'message': message})
+
+        if export_format in file_map:
+            file_path = os.path.join(session_folder_path, file_map[export_format])
+            if not os.path.exists(file_path):
+                return jsonify({'error': f'{export_format.upper()} file not found after generation.'}), 404
+            return send_file(file_path, as_attachment=True)
+
+        elif export_format in ['png', 'all']:
+            # For multiple files, create a zip archive and send it.
+            archive_name = f"{participant_name}_breathing_analysis_{export_format}"
+            archive_path_base = os.path.join(app.config['RESULTS_FOLDER'], archive_name)
+            shutil.make_archive(archive_path_base, 'zip', session_folder_path)
+            return send_file(f"{archive_path_base}.zip", as_attachment=True)
+
+        return jsonify({'error': 'Invalid export format specified.'}), 400
+
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
