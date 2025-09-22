@@ -372,23 +372,63 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
     """
     os.makedirs(output_dir, exist_ok=True)
 
+    # Check if we have sufficient data for analysis
+    has_cycle_data = not df_table.empty and len(df_table) > 0
+    has_events = len(events) > 0
+
     # --- Save Respiratory Cycles Table in Multiple Formats ---
     if export_format in ['csv', 'all']:
         table_path = os.path.join(output_dir, 'respiratory_cycles.csv')
-        df_table.to_csv(table_path, index=False)
+        if has_cycle_data:
+            df_table.to_csv(table_path, index=False)
+        else:
+            # Create a basic table with available events
+            simple_df = pd.DataFrame([{
+                'Event_ID': event['id'],
+                'Type': event['type'], 
+                'Start_Time': event['start'],
+                'End_Time': event['end'],
+                'Duration': event['end'] - event['start']
+            } for event in events])
+            simple_df.to_csv(table_path, index=False)
     
     if export_format in ['excel', 'all']:
         try:
             excel_path = os.path.join(output_dir, 'respiratory_cycles.xlsx')
-            df_table.to_excel(excel_path, index=False, sheet_name='Respiratory_Cycles')
+            if has_cycle_data:
+                df_table.to_excel(excel_path, index=False, sheet_name='Respiratory_Cycles')
+            else:
+                simple_df = pd.DataFrame([{
+                    'Event_ID': event['id'],
+                    'Type': event['type'], 
+                    'Start_Time': event['start'],
+                    'End_Time': event['end'],
+                    'Duration': event['end'] - event['start']
+                } for event in events])
+                simple_df.to_excel(excel_path, index=False, sheet_name='Events')
         except ImportError:
             # Fallback to CSV if openpyxl is not available
             if export_format == 'excel':
                 table_path = os.path.join(output_dir, 'respiratory_cycles.csv')
-                df_table.to_csv(table_path, index=False)
+                if has_cycle_data:
+                    df_table.to_csv(table_path, index=False)
+                else:
+                    simple_df = pd.DataFrame([{
+                        'Event_ID': event['id'],
+                        'Type': event['type'], 
+                        'Start_Time': event['start'],
+                        'End_Time': event['end'],
+                        'Duration': event['end'] - event['start']
+                    } for event in events])
+                    simple_df.to_csv(table_path, index=False)
+
+    # --- Handle cycle events safely ---
+    try:
+        _, cycle_events = build_respiratory_cycles_table(events)
+    except Exception:
+        cycle_events = []
 
     # --- Enrich events with cycle number and save for ML ---
-    _, cycle_events = build_respiratory_cycles_table(events)
     enriched_events = []
     for event in events:
         enriched_event = event.copy()
@@ -397,13 +437,17 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
             if cycle['start'] <= event['start'] and event['end'] <= cycle['end']:
                 enriched_event['cycle_number'] = cycle['cycle_number']
                 break
+        if 'cycle_number' not in enriched_event:
+            enriched_event['cycle_number'] = None
         enriched_events.append(enriched_event)
 
     segmentation_data = {
         "audio_metadata": {
             "original_filename": analysis_data.get("filename", "unknown"),
             "total_duration_seconds": analysis_data.get("duration", 0),
-            "sampling_rate": analysis_data.get("sampling_rate", 0)
+            "sampling_rate": analysis_data.get("sampling_rate", 0),
+            "total_events_detected": len(events),
+            "total_cycles_detected": len(cycle_events)
         },
         "segmentation_events": [
             {
@@ -432,44 +476,58 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
     
     def create_spectrogram_plot(events_to_plot, title_suffix, ax1, ax2):
         """Helper function to create consistent spectrogram plots"""
-        # Plot 1: Audio Signal
-        ax1.fill_between(analysis_data['signal']['t'], analysis_data['signal']['min'], 
-                        analysis_data['signal']['max'], color='gray', alpha=0.5, label='Audio Signal')
-        ax1.set_ylabel('Amplitude')
-        ax1.set_title(f'Audio Signal and Segmentation - {title_suffix}')
-        ax1.grid(True, alpha=0.3)
-        ax1.legend(loc='upper right')
+        try:
+            # Plot 1: Audio Signal
+            if 'signal' in analysis_data and analysis_data['signal']:
+                ax1.fill_between(analysis_data['signal']['t'], analysis_data['signal']['min'], 
+                                analysis_data['signal']['max'], color='gray', alpha=0.5, label='Audio Signal')
+            ax1.set_ylabel('Amplitude')
+            ax1.set_title(f'Audio Signal and Segmentation - {title_suffix}')
+            ax1.grid(True, alpha=0.3)
+            ax1.legend(loc='upper right')
 
-        # Plot 2: Breathing Envelope and Phases
-        ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['positive_mean'], 
-                label='Positive Envelope', color='blue', linewidth=1.5)
-        ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['negative_mean'], 
-                label='Negative Envelope', color='purple', linewidth=1.5)
-        ax2.set_xlabel('Time (s)')
-        ax2.set_ylabel('Mean Amplitude')
-        ax2.grid(True, alpha=0.3)
+            # Plot 2: Breathing Envelope and Phases
+            if 'envelope' in analysis_data and analysis_data['envelope']:
+                ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['positive_mean'], 
+                        label='Positive Envelope', color='blue', linewidth=1.5)
+                ax2.plot(analysis_data['envelope']['time'], analysis_data['envelope']['negative_mean'], 
+                        label='Negative Envelope', color='purple', linewidth=1.5)
+            
+            ax2.set_xlabel('Time (s)')
+            ax2.set_ylabel('Mean Amplitude')
+            ax2.grid(True, alpha=0.3)
 
-        # Add phase rectangles
-        for event in events_to_plot:
-            ax2.add_patch(Rectangle((event['start'], ax2.get_ylim()[0]), 
-                                   event['end'] - event['start'], 
-                                   ax2.get_ylim()[1] - ax2.get_ylim()[0], 
-                                   color=phase_colors.get(event['type'], 'gray'), 
-                                   alpha=0.3))
+            # Add phase rectangles if we have valid y-limits
+            if len(events_to_plot) > 0:
+                ylim = ax2.get_ylim()
+                if ylim[1] > ylim[0]:  # Valid y-limits
+                    for event in events_to_plot:
+                        ax2.add_patch(Rectangle((event['start'], ylim[0]), 
+                                               event['end'] - event['start'], 
+                                               ylim[1] - ylim[0], 
+                                               color=phase_colors.get(event['type'], 'gray'), 
+                                               alpha=0.3))
 
-        # Add cycle numbers
-        _, temp_cycle_events = build_respiratory_cycles_table(events_to_plot)
-        for cycle in temp_cycle_events:
-            ax2.text(cycle['start'], ax2.get_ylim()[1] * 0.9, f" {cycle['label']}", 
-                    color='blue', fontsize=10, ha='left', va='top', weight='bold')
+            # Add cycle numbers if available
+            if cycle_events:
+                for cycle in cycle_events:
+                    ax2.text(cycle['start'], ax2.get_ylim()[1] * 0.9, f" {cycle['label']}", 
+                            color='blue', fontsize=10, ha='left', va='top', weight='bold')
 
-        # Enhanced color legend
-        handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
-        labels = [f'{phase.title()} Phase' for phase in phase_colors.keys()]
-        ax2.legend(handles + [plt.Line2D([0], [0], color='blue', linewidth=1.5),
-                             plt.Line2D([0], [0], color='purple', linewidth=1.5)], 
-                  labels + ['Positive Envelope', 'Negative Envelope'], 
-                  loc='lower right', fontsize=9)
+            # Enhanced color legend
+            handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
+            labels = [f'{phase.title()} Phase' for phase in phase_colors.keys()]
+            legend_elements = handles + [plt.Line2D([0], [0], color='blue', linewidth=1.5),
+                                       plt.Line2D([0], [0], color='purple', linewidth=1.5)]
+            legend_labels = labels + ['Positive Envelope', 'Negative Envelope']
+            ax2.legend(legend_elements, legend_labels, loc='lower right', fontsize=9)
+        
+        except Exception as e:
+            # Fallback: create simple plot with error message
+            ax1.text(0.5, 0.5, f'Error creating plot: {str(e)}', 
+                    transform=ax1.transAxes, ha='center', va='center')
+            ax2.text(0.5, 0.5, f'Insufficient data for visualization', 
+                    transform=ax2.transAxes, ha='center', va='center')
 
     # --- Create Comprehensive PDF Report ---
     if export_format in ['pdf', 'all']:
@@ -497,27 +555,43 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
             ax.axis('tight')
             ax.axis('off')
             
-            # Create table display
-            table_data = df_table.values
-            table_headers = df_table.columns.tolist()
-            
-            table = ax.table(cellText=table_data, colLabels=table_headers, 
-                           cellLoc='center', loc='center')
-            table.auto_set_font_size(False)
-            table.set_fontsize(9)
-            table.scale(1.2, 1.5)
-            
-            # Style the table
-            for i, header in enumerate(table_headers):
-                table[(0, i)].set_facecolor('#4CAF50')
-                table[(0, i)].set_text_props(weight='bold', color='white')
-            
-            plt.suptitle('Respiratory Cycles Summary Table', fontsize=16, fontweight='bold', y=0.95)
+            if has_cycle_data:
+                # Create table display
+                table_data = df_table.values
+                table_headers = df_table.columns.tolist()
+                
+                table = ax.table(cellText=table_data, colLabels=table_headers, 
+                               cellLoc='center', loc='center')
+                table.auto_set_font_size(False)
+                table.set_fontsize(9)
+                table.scale(1.2, 1.5)
+                
+                # Style the table
+                for i, header in enumerate(table_headers):
+                    table[(0, i)].set_facecolor('#4CAF50')
+                    table[(0, i)].set_text_props(weight='bold', color='white')
+                
+                plt.suptitle('Respiratory Cycles Summary Table', fontsize=16, fontweight='bold', y=0.95)
+            else:
+                # Show events summary instead
+                ax.text(0.5, 0.7, 'Insufficient Data for Cycle Analysis', 
+                       transform=ax.transAxes, ha='center', va='center', 
+                       fontsize=16, fontweight='bold')
+                
+                events_text = f"Detected Events:\n"
+                for i, event in enumerate(events[:10]):  # Show first 10 events
+                    events_text += f"• {event['type'].title()}: {event['start']}-{event['end']}s\n"
+                if len(events) > 10:
+                    events_text += f"... and {len(events)-10} more events"
+                
+                ax.text(0.5, 0.5, events_text, transform=ax.transAxes, ha='center', va='center', 
+                       fontsize=12, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
             
             # Add analysis summary text
             summary_text = f"""
 Analysis Summary:
 • Total Duration: {analysis_data.get('duration', 0):.1f} seconds
+• Total Events Detected: {len(events)}
 • Total Breathing Cycles: {len(cycle_events)}
 • Sampling Rate: {analysis_data.get('sampling_rate', 0)} Hz
 • File: {analysis_data.get('filename', 'unknown')}
@@ -526,6 +600,8 @@ Phase Color Legend:
 • Green: Inhalation phases
 • Orange: Exhalation phases  
 • Red: Apnea (breath holding) phases
+
+Note: Cycle analysis requires complete breathing patterns (Inhalation→Apnea→Exhalation→Apnea)
             """
             plt.figtext(0.02, 0.02, summary_text, fontsize=10, 
                        bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.8))

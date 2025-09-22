@@ -1,0 +1,17 @@
+{
+    "audio_metadata": {
+        "original_filename": "test_breathing.wav",
+        "total_duration_seconds": 10.0,
+        "sampling_rate": 22050,
+        "total_events_detected": 1,
+        "total_cycles_detected": 0
+    },
+    "segmentation_events": [
+        {
+            "start_time": 0.0,
+            "end_time": 9.0,
+            "label": "inhalation",
+            "cycle_number": null
+        }
+    ]
+}
