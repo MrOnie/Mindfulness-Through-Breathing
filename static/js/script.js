@@ -302,29 +302,94 @@ document.addEventListener('DOMContentLoaded', function() {
             saveResults('excel');
         });
 
-        // Zoom functionality
-        let currentZoomLevel = 1;
-        const maxZoom = 10;
-        const minZoom = 0.1;
-        
-        function updateZoom(factor) {
-            currentZoomLevel *= factor;
-            currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
+// Zoom functionality - versión corregida
+let currentZoomLevel = 1;
+const maxZoom = 10;
+const minZoom = 0.1;
+
+function updateZoom(factor) {
+    currentZoomLevel *= factor;
+    currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
+
+    // Usar la posición actual del audio como centro del zoom
+    let center = 0;
+    if (audioPlayer && !isNaN(audioPlayer.currentTime)) {
+        center = audioPlayer.currentTime;
+    } else {
+        // Si no hay audio o no está reproduciendo, usar el centro de la vista actual
+        const currentChart = breathingChart || signalChart;
+        if (currentChart && currentChart.scales.x) {
+            center = currentChart.scales.x.min + (currentChart.scales.x.max - currentChart.scales.x.min) / 2;
+        } else {
+            center = data.duration / 2;
+        }
+    }
+
+    [signalChart, breathingChart].forEach(chart => {
+        if (chart) {
+            const duration = data.duration;
+            const zoomedDuration = duration / currentZoomLevel;
+            let newMin = center - (zoomedDuration / 2);
+            let newMax = center + (zoomedDuration / 2);
+
+            // Ajustar los límites si se salen del rango válido
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = Math.min(zoomedDuration, duration);
+            } else if (newMax > duration) {
+                newMax = duration;
+                newMin = Math.max(0, duration - zoomedDuration);
+            }
+
+            chart.options.scales.x.min = newMin;
+            chart.options.scales.x.max = newMax;
+            chart.update('none');
+        }
+    });
+}
+
+    function resetZoom() {
+        currentZoomLevel = 1;
+        [signalChart, breathingChart].forEach(chart => {
+            if (chart) {
+                chart.options.scales.x.min = 0;
+                chart.options.scales.x.max = data.duration;
+                chart.update('none');
+            }
+        });
+    }
+
+    // También podrías agregar una función para hacer zoom a la posición actual del audio
+    function zoomToAudioPosition(zoomLevel = 2) {
+        if (audioPlayer && !isNaN(audioPlayer.currentTime)) {
+            currentZoomLevel = zoomLevel;
+            const center = audioPlayer.currentTime;
+            const duration = data.duration;
+            const zoomedDuration = duration / currentZoomLevel;
             
-            // Apply zoom to both charts
+            let newMin = center - (zoomedDuration / 2);
+            let newMax = center + (zoomedDuration / 2);
+
+            // Ajustar los límites si se salen del rango válido
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = Math.min(zoomedDuration, duration);
+            } else if (newMax > duration) {
+                newMax = duration;
+                newMin = Math.max(0, duration - zoomedDuration);
+            }
+
             [signalChart, breathingChart].forEach(chart => {
                 if (chart) {
-                    const duration = data.duration;
-                    const zoomedDuration = duration / currentZoomLevel;
-                    const center = chart.scales.x.min + (chart.scales.x.max - chart.scales.x.min) / 2;
-                    
-                    chart.options.scales.x.min = Math.max(0, center - zoomedDuration / 2);
-                    chart.options.scales.x.max = Math.min(duration, center + zoomedDuration / 2);
+                    chart.options.scales.x.min = newMin;
+                    chart.options.scales.x.max = newMax;
                     chart.update('none');
                 }
             });
         }
-        
+    }
+
+
         function resetZoom() {
             currentZoomLevel = 1;
             [signalChart, breathingChart].forEach(chart => {
