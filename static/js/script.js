@@ -18,6 +18,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- Start of moved and new JavaScript code ---
     // Check if analysis_data is available (passed from Flask)
     if (typeof analysis_data !== 'undefined' && analysis_data !== null) {
+        // Set the value of the recalc input to the factor used in the analysis
+        const apneaThresholdRecalcInput = document.getElementById('apnea_threshold_recalc');
+        if (apneaThresholdRecalcInput && analysis_data.apnea_threshold_factor) {
+            apneaThresholdRecalcInput.value = analysis_data.apnea_threshold_factor;
+        }
         // --- Global variables ---
         let data = analysis_data; // Use the global analysis_data
         let dbId = data.db_id;
@@ -30,11 +35,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // --- State variables ---
         let selectedPhaseIds = new Set();
         let rangeStartPhaseId = null;
+        let splitModeActive = false;
 
         // --- DOM Elements ---
         const btnRecalculate = document.getElementById('recalculate-button');
         const btnUndo = document.getElementById('undo-button');
         const btnMerge = document.getElementById('merge-button');
+        const btnSplit = document.getElementById('split-button');
         const btnDelete = document.getElementById('delete-button');
         const btnSave = document.getElementById('save-button');
         const cyclesTableContainer = document.getElementById('tabla-ciclos-container');
@@ -141,6 +148,18 @@ document.addEventListener('DOMContentLoaded', function() {
             const numSelected = selectedPhaseIds.size;
             btnDelete.disabled = numSelected === 0;
             btnMerge.disabled = numSelected < 2;
+            btnSplit.disabled = numSelected !== 1;
+
+            // If split mode is active, ensure the button text is correct
+            if (splitModeActive && numSelected !== 1) {
+                splitModeActive = false;
+                btnSplit.textContent = 'Split Phase';
+                btnSplit.classList.remove('btn-warning');
+                if (breathingChart) {
+                    breathingChart.getCanvas().style.cursor = 'default';
+                }
+            }
+
             fetch('/undo', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ db_id: dbId, check: true }) })
                 .then(res => res.json()).then(data => { btnUndo.disabled = !data.undo_available; });
         }
@@ -154,61 +173,94 @@ document.addEventListener('DOMContentLoaded', function() {
             updateButtonStates();
         }
 
+        // Define the click handler in a scope accessible by all parts of the script
+        const annotationClickHandler = (ctx, event) => {
+            if (splitModeActive) return; // Do not handle selection clicks in split mode
+            if (!ctx.element || ctx.element.options.type !== 'box') return;
+            const clickedEventId = parseInt(ctx.element.options.id.replace('box', ''), 10);
+            if (isNaN(clickedEventId)) return;
+
+            if (!rangeStartPhaseId || rangeStartPhaseId === clickedEventId) {
+                rangeStartPhaseId = rangeStartPhaseId ? null : clickedEventId;
+                selectedPhaseIds.clear();
+                if(rangeStartPhaseId) selectedPhaseIds.add(clickedEventId);
+            } else {
+                const allEvents = [...events].sort((a, b) => a.start - b.start);
+                const startIndex = allEvents.findIndex(e => e.id === rangeStartPhaseId);
+                const endIndex = allEvents.findIndex(e => e.id === clickedEventId);
+                selectedPhaseIds.clear();
+                const [start, end] = [startIndex, endIndex].sort((a, b) => a - b);
+                for (let i = start; i <= end; i++) { selectedPhaseIds.add(allEvents[i].id); }
+                rangeStartPhaseId = null;
+            }
+            updateSelection();
+        };
+
         // --- Chart Initialization ---
         function initializeCharts() {
-            const baseAxisOptions = { type: 'linear', position: 'bottom', min: 0, max: data.duration, ticks: { stepSize: 30, callback: (val) => `${Math.floor(val/60)}:${(Math.floor(val%60)).toString().padStart(2,'0')}` } };
+            try {
+                const baseAxisOptions = { type: 'linear', position: 'bottom', min: 0, max: data.duration, ticks: { stepSize: 30, callback: (val) => `${Math.floor(val/60)}:${(Math.floor(val%60)).toString().padStart(2,'0')}` } };
 
-            signalChart = new Chart(document.getElementById('signal-chart').getContext('2d'), {
-                type: 'line',
-                data: { datasets: [{
-                        label: 'Max Amplitude', data: signal.max.map((val, i) => ({ x: signal.t[i], y: val })), borderColor: 'rgba(128, 128, 128, 0.8)', backgroundColor: 'rgba(128, 128, 128, 0.8)', borderWidth: 1, pointRadius: 0, fill: 'origin'
-                    }, {
-                        label: 'Min Amplitude', data: signal.min.map((val, i) => ({ x: signal.t[i], y: val })), borderColor: 'rgba(128, 128, 128, 0.8)', backgroundColor: 'rgba(128, 128, 128, 0.8)', borderWidth: 1, pointRadius: 0, fill: 'origin'
-                    }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, scales: { x: { ...baseAxisOptions, title: { display: false } }, y: { title: { display: false }, min: -1, max: 1, ticks: { callback: (val) => val.toFixed(2) } } }, plugins: { legend: { display: false } } }
-            });
+                signalChart = new Chart(document.getElementById('signal-chart').getContext('2d'), {
+                    type: 'line',
+                    data: { datasets: [{
+                            label: 'Max Amplitude', data: signal.max.map((val, i) => ({ x: signal.t[i], y: val })), borderColor: 'rgba(128, 128, 128, 0.8)', backgroundColor: 'rgba(128, 128, 128, 0.8)', borderWidth: 1, pointRadius: 0, fill: 'origin'
+                        }, {
+                            label: 'Min Amplitude', data: signal.min.map((val, i) => ({ x: signal.t[i], y: val })), borderColor: 'rgba(128, 128, 128, 0.8)', backgroundColor: 'rgba(128, 128, 128, 0.8)', borderWidth: 1, pointRadius: 0, fill: 'origin'
+                        }]
+                    },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { x: { ...baseAxisOptions, title: { display: false } }, y: { title: { display: false }, min: -1, max: 1, ticks: { callback: (val) => val.toFixed(2) } } }, plugins: { legend: { display: false } } }
+                });
 
-            breathingChart = new Chart(document.getElementById('breathing-chart').getContext('2d'), {
-                type: 'line',
-                data: { datasets: [{
-                        label: 'Positive Envelope', data: envelope.positive_mean.map((val, i) => ({ x: envelope.time[i], y: val })), borderColor: 'blue', borderWidth: 1.5, pointRadius: 0
-                    }, {
-                        label: 'Negative Envelope', data: envelope.negative_mean.map((val, i) => ({ x: envelope.time[i], y: val })), borderColor: 'purple', borderWidth: 1.5, pointRadius: 0
-                    }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false,
-                    scales: { x: { ...baseAxisOptions, title: { display: true, text: 'Time (mm:ss)' } }, y: { title: { display: false }, ticks: { callback: (val) => val.toFixed(2) } } },
-                    plugins: {
-                        legend: { display: false },
-                        annotation: {
-                            drawTime: 'beforeDatasetsDraw',
-                            annotations: createAnnotations(events, data.cycle_events),
-                            click: (ctx, event) => {
-                                if (!ctx.element || ctx.element.options.type !== 'box') return;
-                                const clickedEventId = parseInt(ctx.element.options.id.replace('box', ''), 10);
-                                if (isNaN(clickedEventId)) return;
-
-                                if (!rangeStartPhaseId || rangeStartPhaseId === clickedEventId) {
-                                    rangeStartPhaseId = rangeStartPhaseId ? null : clickedEventId;
-                                    selectedPhaseIds.clear();
-                                    if(rangeStartPhaseId) selectedPhaseIds.add(clickedEventId);
-                                } else {
-                                    const allEvents = [...events].sort((a, b) => a.start - b.start);
-                                    const startIndex = allEvents.findIndex(e => e.id === rangeStartPhaseId);
-                                    const endIndex = allEvents.findIndex(e => e.id === clickedEventId);
-                                    selectedPhaseIds.clear();
-                                    const [start, end] = [startIndex, endIndex].sort((a, b) => a - b);
-                                    for (let i = start; i <= end; i++) { selectedPhaseIds.add(allEvents[i].id); }
-                                    rangeStartPhaseId = null;
-                                }
-                                updateSelection();
+                breathingChart = new Chart(document.getElementById('breathing-chart').getContext('2d'), {
+                    type: 'line',
+                    data: { datasets: [{
+                            label: 'Positive Envelope', data: envelope.positive_mean.map((val, i) => ({ x: envelope.time[i], y: val })), borderColor: 'blue', borderWidth: 1.5, pointRadius: 0
+                        }, {
+                            label: 'Negative Envelope', data: envelope.negative_mean.map((val, i) => ({ x: envelope.time[i], y: val })), borderColor: 'purple', borderWidth: 1.5, pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true, maintainAspectRatio: false,
+                        scales: { x: { ...baseAxisOptions, title: { display: true, text: 'Time (mm:ss)' } }, y: { title: { display: false }, ticks: { callback: (val) => val.toFixed(2) } } },
+                        plugins: {
+                            legend: { display: false },
+                            annotation: {
+                                drawTime: 'beforeDatasetsDraw',
+                                annotations: createAnnotations(events, data.cycle_events),
+                                click: annotationClickHandler // Assign the handler here
                             }
                         }
                     }
-                }
-            });
+                });
+
+                // Add the canvas click listener here, after the chart is created
+                document.getElementById('breathing-chart').addEventListener('click', (evt) => {
+                    if (!splitModeActive) return;
+
+                    const selectedId = selectedPhaseIds.values().next().value;
+                    const segmentToSplit = events.find(e => e.id === selectedId);
+                    
+                    const chart = breathingChart;
+                    const rect = chart.canvas.getBoundingClientRect();
+                    const x = evt.clientX - rect.left;
+                    const splitTime = chart.scales.x.getValueForPixel(x);
+
+                    if (splitTime > segmentToSplit.start && splitTime < segmentToSplit.end) {
+                        performAction('/split', { db_id: dbId, segment_id: selectedId, split_time: splitTime });
+                    } else {
+                        alert('Split point must be within the selected phase.');
+                    }
+
+                    // Reset split mode automatically after a click attempt
+                    splitModeActive = false;
+                    btnSplit.textContent = 'Split Phase';
+                    btnSplit.classList.remove('active', 'btn-warning');
+                    breathingChart.getCanvas().style.cursor = 'default';
+                });
+            } catch (e) {
+                alert('A critical error occurred while creating the charts: ' + e.message + '\n\nStack Trace:\n' + e.stack);
+            }
         }
 
         // --- Event Listeners ---
@@ -217,20 +269,154 @@ document.addEventListener('DOMContentLoaded', function() {
         btnUndo.addEventListener('click', () => performAction('/undo', { db_id: dbId }));
         btnRecalculate.addEventListener('click', () => {
             if (confirm('Are you sure you want to discard all changes and run the initial analysis again?')) {
-                performAction('/recalculate', { db_id: dbId });
+                const threshold = document.getElementById('apnea_threshold_recalc').value;
+                performAction('/recalculate', { db_id: dbId, apnea_threshold: threshold });
             }
         });
-        btnSave.addEventListener('click', async () => {
+
+        btnSplit.addEventListener('click', () => {
+            if (selectedPhaseIds.size !== 1) return;
+            splitModeActive = !splitModeActive;
+
+            if (splitModeActive) {
+                btnSplit.textContent = 'Cancel Split';
+                btnSplit.classList.add('active', 'btn-warning');
+                breathingChart.getCanvas().style.cursor = 'crosshair';
+            } else {
+                btnSplit.textContent = 'Split Phase';
+                btnSplit.classList.remove('active', 'btn-warning');
+                breathingChart.getCanvas().style.cursor = 'default';
+            }
+        });
+        
+        // --- Save/Export Listeners ---
+        async function saveResults(exportFormat) {
             loadingOverlay.style.display = 'flex';
             try {
                 const response = await fetch('/save_results', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ db_id: dbId })
+                    body: JSON.stringify({ db_id: dbId, export_format: exportFormat })
+                });
+
+                const contentType = response.headers.get('content-type');
+
+                if (contentType && contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    alert(`Error: ${errorData.error || 'Unknown server error'}`);
+                } else if (response.ok) {
+                    const blob = await response.blob();
+                    const disposition = response.headers.get('Content-Disposition');
+                    let filename = `results.${exportFormat}`;
+                    if (disposition && disposition.includes('attachment')) {
+                        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
+                        if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1];
+                    }
+                    const link = document.createElement('a');
+                    const url = window.URL.createObjectURL(blob);
+                    link.href = url;
+                    link.setAttribute('download', filename);
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                    window.URL.revokeObjectURL(url);
+                } else {
+                    alert(`An error occurred while generating the file. Status: ${response.status}`);
+                }
+            } catch (error) {
+                alert(`An unexpected error occurred: ${error}`);
+            } finally {
+                loadingOverlay.style.display = 'none';
+            }
+        }
+
+        document.getElementById('save-all').addEventListener('click', (e) => { e.preventDefault(); saveResults('all'); });
+        document.getElementById('save-pdf').addEventListener('click', (e) => { e.preventDefault(); saveResults('pdf'); });
+        document.getElementById('save-png').addEventListener('click', (e) => { e.preventDefault(); saveResults('png'); });
+        document.getElementById('save-csv').addEventListener('click', (e) => { e.preventDefault(); saveResults('csv'); });
+        document.getElementById('save-excel').addEventListener('click', (e) => { e.preventDefault(); saveResults('excel'); });
+
+        // --- Zoom Functionality ---
+        let currentZoomLevel = 1;
+        const maxZoom = 10;
+        const minZoom = 0.1;
+
+        function updateZoom(factor) {
+            currentZoomLevel *= factor;
+            currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
+            let center = audioPlayer.currentTime || (data.duration / 2);
+
+            [signalChart, breathingChart].forEach(chart => {
+                if (chart) {
+                    const duration = data.duration;
+                    const zoomedDuration = duration / currentZoomLevel;
+                    let newMin = center - (zoomedDuration / 2);
+                    let newMax = center + (zoomedDuration / 2);
+
+                    if (newMin < 0) { newMin = 0; newMax = Math.min(zoomedDuration, duration); }
+                    else if (newMax > duration) { newMax = duration; newMin = Math.max(0, duration - zoomedDuration); }
+
+                    chart.options.scales.x.min = newMin;
+                    chart.options.scales.x.max = newMax;
+                    chart.update('none');
+                }
+            });
+        }
+
+        function resetZoom() {
+            currentZoomLevel = 1;
+            [signalChart, breathingChart].forEach(chart => {
+                if (chart) {
+                    chart.options.scales.x.min = 0;
+                    chart.options.scales.x.max = data.duration;
+                    chart.update('none');
+                }
+            });
+        }
+
+        document.getElementById('zoom-in').addEventListener('click', () => updateZoom(1.5));
+        document.getElementById('zoom-out').addEventListener('click', () => updateZoom(0.67));
+        document.getElementById('zoom-reset').addEventListener('click', resetZoom);
+
+        // --- Config Modal Listeners ---
+        $('#config-modal').on('show.bs.modal', function () {
+            // Populate modal with default values
+            document.getElementById('target-cycle-duration').value = default_config.TARGET_CYCLE_DURATION;
+            document.getElementById('target-ie-ratio').value = default_config.TARGET_IE_RATIO;
+            document.getElementById('target-apnea-percentage').value = default_config.TARGET_APNEA_PERCENTAGE;
+        });
+
+        document.getElementById('recalculate-scores-button').addEventListener('click', async () => {
+            const custom_config = {
+                "TARGET_CYCLE_DURATION": parseFloat(document.getElementById('target-cycle-duration').value),
+                "TARGET_IE_RATIO": parseFloat(document.getElementById('target-ie-ratio').value),
+                "TARGET_APNEA_PERCENTAGE": parseFloat(document.getElementById('target-apnea-percentage').value),
+            };
+
+            loadingOverlay.style.display = 'flex';
+            try {
+                const response = await fetch('/recalculate_scores', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ db_id: dbId, config: custom_config })
                 });
                 const responseData = await response.json();
                 if (response.ok && responseData.success) {
-                    alert(responseData.message);
+                    // Update analysis summary section only
+                    const r = responseData.respiration_analysis;
+                    analysisContainer.innerHTML = `
+                        <p>Based on <strong>${r.num_cycles}</strong> respiratory cycles.</p>
+                        <ul>
+                            <li><strong>Depth Score:</strong> ${r.scores.Depth} / 100</li>
+                            <li><strong>Stability Score:</strong> ${r.scores.Stability} / 100</li>
+                            <li><strong>Internal Balance Score:</strong> ${r.scores['Internal Balance']} / 100</li>
+                        </ul>
+                        <h4><strong>Final Score:</strong> ${r.scores.Final} / 100</h4><hr>
+                        <h5>Quick Diagnosis</h5>
+                        <p>The pillar with the most room for improvement is: <strong>${r.weakest_pillar}</strong>.</p>
+                        <p><strong>Recommendation:</strong> ${r.recommendation}</p>
+                    `;
+                    $('#config-modal').modal('hide');
                 } else {
                     alert(`Error: ${responseData.error || 'Unknown error'}`);
                 }
@@ -246,34 +432,16 @@ document.addEventListener('DOMContentLoaded', function() {
             audioPlayer.addEventListener('timeupdate', () => {
                 if (breathingChart) {
                     const currentTime = audioPlayer.currentTime;
-                    const xScale = breathingChart.scales.x;
-                    const xPosition = xScale.getPixelForValue(currentTime);
-
-                    // Remove previous playback line annotation if it exists
                     if (breathingChart.options.plugins.annotation.annotations.playbackLine) {
                         delete breathingChart.options.plugins.annotation.annotations.playbackLine;
                     }
-
-                    // Add new playback line annotation
                     breathingChart.options.plugins.annotation.annotations.playbackLine = {
-                        type: 'line',
-                        mode: 'vertical',
-                        scaleID: 'x',
-                        value: currentTime,
-                        borderColor: 'red',
-                        borderWidth: 2,
-                        label: {
-                            content: 'Current Playback',
-                            enabled: false, // Set to true for debugging
-                            position: 'top'
-                        }
+                        type: 'line', mode: 'vertical', scaleID: 'x', value: currentTime, borderColor: 'red', borderWidth: 2
                     };
                     breathingChart.update('none');
                 }
             });
-
             audioPlayer.addEventListener('ended', () => {
-                // Remove playback line when audio ends
                 if (breathingChart && breathingChart.options.plugins.annotation.annotations.playbackLine) {
                     delete breathingChart.options.plugins.annotation.annotations.playbackLine;
                     breathingChart.update('none');
