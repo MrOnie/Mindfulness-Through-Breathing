@@ -129,10 +129,9 @@ def save_results_endpoint():
 
         events = analysis_data.get('events', [])
         df_table, _ = build_respiratory_cycles_table(events)
-        respiration_analysis = analyze_respiration(df_table)
 
         # This function saves the file(s) to the server's disk.
-        save_analysis_results(session_folder_path, events, df_table, analysis_data, respiration_analysis, export_format)
+        save_analysis_results(session_folder_path, events, df_table, analysis_data, export_format)
 
         # Now, instead of returning JSON, we send the generated file.
         file_map = {
@@ -176,7 +175,7 @@ def recalculate():
 
     # Store original events for comparison in export
     analysis_data['original_events'] = analysis_data['events'].copy()
-    analysis_data.update({'db_id': db_id, 'session_folder': session_folder, 'audio_filename': audio_filename, 'apnea_threshold_factor': apnea_threshold_factor})
+    analysis_data.update({'db_id': db_id, 'session_folder': session_folder, 'audio_filename': audio_filename})
     with open(json_path, 'w') as f: json.dump(analysis_data, f, indent=4)
     
     return _get_updated_data_response(analysis_data, db_id)

@@ -273,54 +273,19 @@ document.addEventListener('DOMContentLoaded', function() {
                 performAction('/recalculate', { db_id: dbId, apnea_threshold: threshold });
             }
         });
-
-        btnSplit.addEventListener('click', () => {
-            if (selectedPhaseIds.size !== 1) return;
-            splitModeActive = !splitModeActive;
-
-            if (splitModeActive) {
-                btnSplit.textContent = 'Cancel Split';
-                btnSplit.classList.add('active', 'btn-warning');
-                breathingChart.getCanvas().style.cursor = 'crosshair';
-            } else {
-                btnSplit.textContent = 'Split Phase';
-                btnSplit.classList.remove('active', 'btn-warning');
-                breathingChart.getCanvas().style.cursor = 'default';
-            }
-        });
-        
-        // --- Save/Export Listeners ---
-        async function saveResults(exportFormat) {
+        btnSave.addEventListener('click', async () => {
             loadingOverlay.style.display = 'flex';
             try {
                 const response = await fetch('/save_results', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ db_id: dbId, export_format: exportFormat })
+                    body: JSON.stringify({ db_id: dbId })
                 });
-
-                const contentType = response.headers.get('content-type');
-
-                if (contentType && contentType.includes('application/json')) {
-                    const errorData = await response.json();
-                    alert(`Error: ${errorData.error || 'Unknown server error'}`);
-                } else if (response.ok) {
-                    const blob = await response.blob();
-                    const disposition = response.headers.get('Content-Disposition');
-                    let filename = `results.${exportFormat}`;
-                    if (disposition && disposition.includes('attachment')) {
-                        const filenameMatch = disposition.match(/filename="?([^"]+)"?/);
-                        if (filenameMatch && filenameMatch[1]) filename = filenameMatch[1];
-                    }
-                    const link = document.createElement('a');
-                    const url = window.URL.createObjectURL(blob);
-                    link.href = url;
-                    link.setAttribute('download', filename);
-                    document.body.appendChild(link);
-                    link.click();
-                    link.remove();
-                    window.URL.revokeObjectURL(url);
+                const responseData = await response.json();
+                if (response.ok && responseData.success) {
+                    alert(responseData.message);
                 } else {
+                    // Handle other HTTP errors.
                     alert(`An error occurred while generating the file. Status: ${response.status}`);
                 }
             } catch (error) {
@@ -330,38 +295,115 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        document.getElementById('save-all').addEventListener('click', (e) => { e.preventDefault(); saveResults('all'); });
-        document.getElementById('save-pdf').addEventListener('click', (e) => { e.preventDefault(); saveResults('pdf'); });
-        document.getElementById('save-png').addEventListener('click', (e) => { e.preventDefault(); saveResults('png'); });
-        document.getElementById('save-csv').addEventListener('click', (e) => { e.preventDefault(); saveResults('csv'); });
-        document.getElementById('save-excel').addEventListener('click', (e) => { e.preventDefault(); saveResults('excel'); });
+        // Export format event listeners
+        document.getElementById('save-all').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('all');
+        });
+        document.getElementById('save-pdf').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('pdf');
+        });
+        document.getElementById('save-png').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('png');
+        });
+        document.getElementById('save-csv').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('csv');
+        });
+        document.getElementById('save-excel').addEventListener('click', (e) => {
+            e.preventDefault();
+            saveResults('excel');
+        });
 
-        // --- Zoom Functionality ---
-        let currentZoomLevel = 1;
-        const maxZoom = 10;
-        const minZoom = 0.1;
+// Zoom functionality - versión corregida
+let currentZoomLevel = 1;
+const maxZoom = 10;
+const minZoom = 0.1;
 
-        function updateZoom(factor) {
-            currentZoomLevel *= factor;
-            currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
-            let center = audioPlayer.currentTime || (data.duration / 2);
+function updateZoom(factor) {
+    currentZoomLevel *= factor;
+    currentZoomLevel = Math.max(minZoom, Math.min(maxZoom, currentZoomLevel));
+
+    // Usar la posición actual del audio como centro del zoom
+    let center = 0;
+    if (audioPlayer && !isNaN(audioPlayer.currentTime)) {
+        center = audioPlayer.currentTime;
+    } else {
+        // Si no hay audio o no está reproduciendo, usar el centro de la vista actual
+        const currentChart = breathingChart || signalChart;
+        if (currentChart && currentChart.scales.x) {
+            center = currentChart.scales.x.min + (currentChart.scales.x.max - currentChart.scales.x.min) / 2;
+        } else {
+            center = data.duration / 2;
+        }
+    }
+
+    [signalChart, breathingChart].forEach(chart => {
+        if (chart) {
+            const duration = data.duration;
+            const zoomedDuration = duration / currentZoomLevel;
+            let newMin = center - (zoomedDuration / 2);
+            let newMax = center + (zoomedDuration / 2);
+
+            // Ajustar los límites si se salen del rango válido
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = Math.min(zoomedDuration, duration);
+            } else if (newMax > duration) {
+                newMax = duration;
+                newMin = Math.max(0, duration - zoomedDuration);
+            }
+
+            chart.options.scales.x.min = newMin;
+            chart.options.scales.x.max = newMax;
+            chart.update('none');
+        }
+    });
+}
+
+    function resetZoom() {
+        currentZoomLevel = 1;
+        [signalChart, breathingChart].forEach(chart => {
+            if (chart) {
+                chart.options.scales.x.min = 0;
+                chart.options.scales.x.max = data.duration;
+                chart.update('none');
+            }
+        });
+    }
+
+    // También podrías agregar una función para hacer zoom a la posición actual del audio
+    function zoomToAudioPosition(zoomLevel = 2) {
+        if (audioPlayer && !isNaN(audioPlayer.currentTime)) {
+            currentZoomLevel = zoomLevel;
+            const center = audioPlayer.currentTime;
+            const duration = data.duration;
+            const zoomedDuration = duration / currentZoomLevel;
+            
+            let newMin = center - (zoomedDuration / 2);
+            let newMax = center + (zoomedDuration / 2);
+
+            // Ajustar los límites si se salen del rango válido
+            if (newMin < 0) {
+                newMin = 0;
+                newMax = Math.min(zoomedDuration, duration);
+            } else if (newMax > duration) {
+                newMax = duration;
+                newMin = Math.max(0, duration - zoomedDuration);
+            }
 
             [signalChart, breathingChart].forEach(chart => {
                 if (chart) {
-                    const duration = data.duration;
-                    const zoomedDuration = duration / currentZoomLevel;
-                    let newMin = center - (zoomedDuration / 2);
-                    let newMax = center + (zoomedDuration / 2);
-
-                    if (newMin < 0) { newMin = 0; newMax = Math.min(zoomedDuration, duration); }
-                    else if (newMax > duration) { newMax = duration; newMin = Math.max(0, duration - zoomedDuration); }
-
                     chart.options.scales.x.min = newMin;
                     chart.options.scales.x.max = newMax;
                     chart.update('none');
                 }
             });
         }
+    }
+
 
         function resetZoom() {
             currentZoomLevel = 1;
@@ -374,58 +416,10 @@ document.addEventListener('DOMContentLoaded', function() {
             });
         }
 
+        // Zoom control event listeners
         document.getElementById('zoom-in').addEventListener('click', () => updateZoom(1.5));
         document.getElementById('zoom-out').addEventListener('click', () => updateZoom(0.67));
         document.getElementById('zoom-reset').addEventListener('click', resetZoom);
-
-        // --- Config Modal Listeners ---
-        $('#config-modal').on('show.bs.modal', function () {
-            // Populate modal with default values
-            document.getElementById('target-cycle-duration').value = default_config.TARGET_CYCLE_DURATION;
-            document.getElementById('target-ie-ratio').value = default_config.TARGET_IE_RATIO;
-            document.getElementById('target-apnea-percentage').value = default_config.TARGET_APNEA_PERCENTAGE;
-        });
-
-        document.getElementById('recalculate-scores-button').addEventListener('click', async () => {
-            const custom_config = {
-                "TARGET_CYCLE_DURATION": parseFloat(document.getElementById('target-cycle-duration').value),
-                "TARGET_IE_RATIO": parseFloat(document.getElementById('target-ie-ratio').value),
-                "TARGET_APNEA_PERCENTAGE": parseFloat(document.getElementById('target-apnea-percentage').value),
-            };
-
-            loadingOverlay.style.display = 'flex';
-            try {
-                const response = await fetch('/recalculate_scores', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ db_id: dbId, config: custom_config })
-                });
-                const responseData = await response.json();
-                if (response.ok && responseData.success) {
-                    // Update analysis summary section only
-                    const r = responseData.respiration_analysis;
-                    analysisContainer.innerHTML = `
-                        <p>Based on <strong>${r.num_cycles}</strong> respiratory cycles.</p>
-                        <ul>
-                            <li><strong>Depth Score:</strong> ${r.scores.Depth} / 100</li>
-                            <li><strong>Stability Score:</strong> ${r.scores.Stability} / 100</li>
-                            <li><strong>Internal Balance Score:</strong> ${r.scores['Internal Balance']} / 100</li>
-                        </ul>
-                        <h4><strong>Final Score:</strong> ${r.scores.Final} / 100</h4><hr>
-                        <h5>Quick Diagnosis</h5>
-                        <p>The pillar with the most room for improvement is: <strong>${r.weakest_pillar}</strong>.</p>
-                        <p><strong>Recommendation:</strong> ${r.recommendation}</p>
-                    `;
-                    $('#config-modal').modal('hide');
-                } else {
-                    alert(`Error: ${responseData.error || 'Unknown error'}`);
-                }
-            } catch (error) {
-                alert(`An unexpected error occurred: ${error}`);
-            } finally {
-                loadingOverlay.style.display = 'none';
-            }
-        });
 
         // --- Audio Playback and Visual Indicator ---
         if (audioPlayer) {
