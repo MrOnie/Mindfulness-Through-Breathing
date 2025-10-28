@@ -66,23 +66,67 @@
                     <div id="headingSignal" data-toggle="collapse" data-target="#collapseSignal" aria-expanded="true" aria-controls="collapseSignal" style="cursor: pointer;">
                         <h3 class="mb-0">Audio Signal and Segmentation</h3>
                     </div>
-                    <div>
+                    <div class="form-inline">
+                        <label for="apnea_threshold_recalc" class="mr-2">Apnea Threshold (Amplitude 0-1):</label>
+                        <input type="number" class="form-control form-control-sm mr-3" id="apnea_threshold_recalc" name="apnea_threshold_recalc" value="0.1" min="0.01" max="1.0" step="0.01" required>
                         <button id="recalculate-button" class="btn btn-info btn-sm" title="Run the initial analysis again">Recalculate</button>
                         <button id="undo-button" class="btn btn-secondary btn-sm" disabled title="Undo the last action">Undo</button>
                         <button id="merge-button" class="btn btn-success btn-sm" disabled title="Select a range of phases to merge">Merge Phases</button>
+                        <button id="split-button" class="btn btn-warning btn-sm" disabled title="Select a single phase to split">Split Phase</button>
                         <button id="delete-button" class="btn btn-danger btn-sm" disabled title="Select a range of phases to delete">Delete Phase</button>
-                        <button id="save-button" class="btn btn-primary btn-sm" title="Save final results (image, CSV, JSON)">Save Results</button>
+                        <!-- Export dropdown -->
+                        <div class="btn-group" role="group">
+                            <button id="save-button" type="button" class="btn btn-primary btn-sm dropdown-toggle" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false" title="Save results in various formats">
+                                Save Results
+                            </button>
+                            <div class="dropdown-menu">
+                                <a class="dropdown-item" href="#" id="save-all">Complete Report (PDF + Data)</a>
+                                <a class="dropdown-item" href="#" id="save-pdf">PDF Report Only</a>
+                                <a class="dropdown-item" href="#" id="save-png">PNG Images Only</a>
+                                <a class="dropdown-item" href="#" id="save-csv">CSV Data Only</a>
+                                <a class="dropdown-item" href="#" id="save-excel">Excel Data Only</a>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div id="collapseSignal" class="collapse show" aria-labelledby="headingSignal">
                     <div class="card-body">
+                        <!-- Zoom Controls -->
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div class="zoom-controls">
+                                <button id="zoom-in" class="btn btn-outline-secondary btn-sm" title="Zoom in for detailed view">🔍+</button>
+                                <button id="zoom-out" class="btn btn-outline-secondary btn-sm" title="Zoom out for overview">🔍-</button>
+                                <button id="zoom-reset" class="btn btn-outline-secondary btn-sm" title="Reset zoom to show full signal">Reset Zoom</button>
+                            </div>
+                            <div class="chart-info text-muted small">
+                                Click and drag to select time range • Use zoom controls for detailed analysis
+                            </div>
+                        </div>
                         <div id="signal-chart-container" style="position: relative; height: 25vh; width: 100%;">
                             <canvas id="signal-chart"></canvas>
                         </div>
                         <div id="breathing-chart-container" style="position: relative; height: 30vh; width: 100%; margin-top: -1px;">
                             <canvas id="breathing-chart"></canvas>
                         </div>
-                        <div id="legend-container" class="d-flex justify-content-center mt-3"></div>
+                        <div id="legend-container" class="d-flex justify-content-center mt-3">
+                            <!-- Enhanced Legend -->
+                            <div class="legend-box p-2 bg-light rounded">
+                                <div class="d-flex align-items-center">
+                                    <div class="legend-item mr-3">
+                                        <span class="legend-color" style="background-color: rgba(75, 192, 192, 0.4); width: 20px; height: 15px; display: inline-block; margin-right: 5px;"></span>
+                                        <span>Inhalation</span>
+                                    </div>
+                                    <div class="legend-item mr-3">
+                                        <span class="legend-color" style="background-color: rgba(255, 206, 86, 0.4); width: 20px; height: 15px; display: inline-block; margin-right: 5px;"></span>
+                                        <span>Exhalation</span>
+                                    </div>
+                                    <div class="legend-item mr-3">
+                                        <span class="legend-color" style="background-color: rgba(255, 99, 132, 0.4); width: 20px; height: 15px; display: inline-block; margin-right: 5px;"></span>
+                                        <span>Apnea</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -93,8 +137,11 @@
                     <div class="col-md-6">
                         <!-- Respiration Analysis -->
                         <div class="card shadow-sm mb-4">
-                            <div class="card-header" id="headingAnalisis" data-toggle="collapse" data-target="#collapseAnalisis" aria-expanded="true" aria-controls="collapseAnalisis" style="cursor: pointer;">
-                                <h3 class="mb-0">Respiration Analysis</h3>
+                            <div class="card-header d-flex justify-content-between align-items-center">
+                                <div id="headingAnalisis" data-toggle="collapse" data-target="#collapseAnalisis" aria-expanded="true" aria-controls="collapseAnalisis" style="cursor: pointer;">
+                                    <h3 class="mb-0">Respiration Analysis</h3>
+                                </div>
+                                <button id="edit-config-button" type="button" class="btn btn-secondary btn-sm" data-toggle="modal" data-target="#config-modal">Edit Parameters</button>
                             </div>
                             <div id="collapseAnalisis" class="collapse show" aria-labelledby="headingAnalisis">
                                 <div class="card-body" id="analisis-respiracion-container">
@@ -131,6 +178,40 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Config Modal -->
+            <div class="modal fade" id="config-modal" tabindex="-1" role="dialog" aria-labelledby="configModalLabel" aria-hidden="true">
+                <div class="modal-dialog" role="document">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="configModalLabel">Edit Score Parameters</h5>
+                            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                                <span aria-hidden="true">&times;</span>
+                            </button>
+                        </div>
+                        <div class="modal-body">
+                            <form id="config-form">
+                                <div class="form-group">
+                                    <label for="target-cycle-duration">Target Cycle Duration (s)</label>
+                                    <input type="number" class="form-control" id="target-cycle-duration" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="target-ie-ratio">Target I/E Ratio</label>
+                                    <input type="number" class="form-control" id="target-ie-ratio" step="0.1">
+                                </div>
+                                <div class="form-group">
+                                    <label for="target-apnea-percentage">Target Apnea Percentage (%)</label>
+                                    <input type="number" class="form-control" id="target-apnea-percentage" step="0.01" min="0" max="1">
+                                </div>
+                            </form>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                            <button type="button" id="recalculate-scores-button" class="btn btn-primary">Save & Recalculate</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
         {% elif error %}
         <div class="alert alert-danger mt-5">
@@ -141,11 +222,14 @@
     </div>
 
     <script src="https://code.jquery.com/jquery-3.5.1.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     {% if analysis_data %}
     <script>
-        const analysis_data = {{ analysis_data|tojson }};
+        var analysis_data = JSON.parse('{{ analysis_data|tojson | safe }}');
+    </script>
+    <script>
+        const default_config = {{ default_config|tojson }};
     </script>
     {% endif %}
     

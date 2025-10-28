@@ -1,8 +1,0 @@
-# Ignore local database and development files
-mindfulness_analysis.db
-__pycache__/
-*.ipynb
-results/
-uploads/
-.git/
-.gitignore
