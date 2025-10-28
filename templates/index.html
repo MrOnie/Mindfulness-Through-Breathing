@@ -226,7 +226,7 @@
     <script src="{{ url_for('static', filename='js/script.js') }}"></script>
     {% if analysis_data %}
     <script>
-        var analysis_data = JSON.parse('{{ analysis_data|tojson | safe }}');
+        const analysis_data = {{ analysis_data|tojson }};
     </script>
     <script>
         const default_config = {{ default_config|tojson }};

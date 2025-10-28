@@ -373,7 +373,7 @@ def calculate_waveshow_data(y, sr, num_vis_points=1000):
     
     return t_wave.tolist(), y_min.tolist(), y_max.tolist()
 
-def save_analysis_results(output_dir, events, df_table, analysis_data):
+def save_analysis_results(output_dir, events, df_table, analysis_data, respiration_analysis, export_format='all'):
     """
     Saves comprehensive analysis results including original and adjusted spectrograms, 
     detailed reports, and data tables in multiple formats.
@@ -383,6 +383,8 @@ def save_analysis_results(output_dir, events, df_table, analysis_data):
         events (list): The list of phase events (current/adjusted).
         df_table (pd.DataFrame): The respiratory cycles table.
         analysis_data (dict): The dictionary with all analysis data.
+        respiration_analysis (dict): The dictionary with respiration analysis scores.
+        export_format (str): Export format - 'pdf', 'png', 'csv', 'excel', or 'all'.
     """
     os.makedirs(output_dir, exist_ok=True)
 
@@ -528,15 +530,126 @@ def save_analysis_results(output_dir, events, df_table, analysis_data):
                     ax2.text(cycle['start'], ax2.get_ylim()[1] * 0.9, f" {cycle['label']}", 
                             color='blue', fontsize=10, ha='left', va='top', weight='bold')
 
-    # Create custom legend
-    handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
-    labels = phase_colors.keys()
-    ax2.legend(handles, labels, loc='lower right')
-    
-    plt.tight_layout()
-    chart_path = os.path.join(output_dir, 'segmentation_chart.png')
-    plt.savefig(chart_path)
-    plt.close(fig)
+            # Enhanced color legend
+            handles = [Rectangle((0,0),1,1, color=color, alpha=0.3) for color in phase_colors.values()]
+            labels = [f'{phase.title()} Phase' for phase in phase_colors.keys()]
+            legend_elements = handles + [plt.Line2D([0], [0], color='blue', linewidth=1.5),
+                                       plt.Line2D([0], [0], color='purple', linewidth=1.5)]
+            legend_labels = labels + ['Positive Envelope', 'Negative Envelope']
+            ax2.legend(legend_elements, legend_labels, loc='lower right', fontsize=9)
+        
+        except Exception as e:
+            # Fallback: create simple plot with error message
+            ax1.text(0.5, 0.5, f'Error creating plot: {str(e)}', 
+                    transform=ax1.transAxes, ha='center', va='center')
+            ax2.text(0.5, 0.5, f'Insufficient data for visualization', 
+                    transform=ax2.transAxes, ha='center', va='center')
+
+    # --- Create Comprehensive PDF Report ---
+    if export_format in ['pdf', 'all']:
+        pdf_path = os.path.join(output_dir, 'comprehensive_breathing_analysis_report.pdf')
+        with PdfPages(pdf_path) as pdf:
+            # Page 1: Original Analysis
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+            create_spectrogram_plot(original_events, "Original Analysis", ax1, ax2)
+            plt.suptitle('Breathing Analysis Report - Original Detection', fontsize=16, fontweight='bold')
+            plt.tight_layout()
+            pdf.savefig(fig, bbox_inches='tight')
+            plt.close(fig)
+
+            # Page 2: Adjusted Analysis (if different from original)
+            if original_events != events:
+                fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 10), sharex=True)
+                create_spectrogram_plot(events, "Manually Adjusted", ax1, ax2)
+                plt.suptitle('Breathing Analysis Report - Manually Adjusted', fontsize=16, fontweight='bold')
+                plt.tight_layout()
+                pdf.savefig(fig, bbox_inches='tight')
+                plt.close(fig)
+
+            # Page 3: Respiratory Cycles Summary Table
+            if has_cycle_data:
+                fig_table, ax_table = plt.subplots(figsize=(11, 8))
+                ax_table.axis('tight')
+                ax_table.axis('off')
+                
+                table = ax_table.table(cellText=df_table.values, colLabels=df_table.columns, 
+                                       cellLoc='center', loc='center')
+                table.auto_set_font_size(False)
+                table.set_fontsize(10)
+                table.scale(1.2, 1.5)
+
+                for (row, col), cell in table.get_celld().items():
+                    if row == 0:
+                        cell.set_facecolor('#4CAF50')
+                        cell.set_text_props(weight='bold', color='white')
+                
+                plt.suptitle('Respiratory Cycles Summary', fontsize=16, fontweight='bold', y=0.92)
+                pdf.savefig(fig_table, bbox_inches='tight')
+                plt.close(fig_table)
+
+            # Page 4: Analysis Summaries
+            fig_summary, ax_summary = plt.subplots(figsize=(11, 8))
+            ax_summary.axis('off')
+            
+            summary_text = f"""
+            Analysis Summary:
+            • Total Duration: {analysis_data.get('duration', 0):.1f} seconds
+            • Total Events Detected: {len(events)}
+            • Total Breathing Cycles: {len(cycle_events)}
+            • Sampling Rate: {analysis_data.get('sampling_rate', 0)} Hz
+            • File: {analysis_data.get('filename', 'unknown')}
+            """
+            ax_summary.text(0.05, 0.75, summary_text, transform=ax_summary.transAxes, fontsize=12, 
+                           verticalalignment='top', bbox=dict(boxstyle="round,pad=0.4", facecolor="#f0f0f0", alpha=1))
+
+            if respiration_analysis:
+                scores = respiration_analysis['scores']
+                analysis_text = f"""
+                Respiration Analysis:
+
+                • Final Score: {scores['Final']} / 100
+                • Depth Score: {scores['Depth']} / 100
+                • Stability Score: {scores['Stability']} / 100
+                • Internal Balance: {scores['Internal Balance']} / 100
+
+                • Weakest Pillar: {respiration_analysis['weakest_pillar']}
+                • Recommendation: {respiration_analysis['recommendation']}
+                """
+                ax_summary.text(0.05, 0.5, analysis_text, transform=ax_summary.transAxes, fontsize=12, 
+                               verticalalignment='top', bbox=dict(boxstyle="round,pad=0.4", facecolor="#e6f7ff", alpha=1))
+            
+            plt.suptitle('Analysis & Respiration Summary', fontsize=16, fontweight='bold', y=0.92)
+            pdf.savefig(fig_summary, bbox_inches='tight')
+            plt.close(fig_summary)
+
+    # --- Save Individual PNG Images ---
+    if export_format in ['png', 'all']:
+        # Original spectrogram
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+        create_spectrogram_plot(original_events, "Original Analysis", ax1, ax2)
+        plt.suptitle('Original Breathing Analysis', fontsize=14, fontweight='bold')
+        plt.tight_layout()
+        original_chart_path = os.path.join(output_dir, 'original_spectrogram.png')
+        plt.savefig(original_chart_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
+
+        # Adjusted spectrogram (if different)
+        if original_events != events:
+            fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+            create_spectrogram_plot(events, "Manually Adjusted", ax1, ax2)
+            plt.suptitle('Adjusted Breathing Analysis', fontsize=14, fontweight='bold')
+            plt.tight_layout()
+            adjusted_chart_path = os.path.join(output_dir, 'adjusted_spectrogram.png')
+            plt.savefig(adjusted_chart_path, dpi=300, bbox_inches='tight')
+            plt.close(fig)
+
+        # Legacy chart for compatibility
+        fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(15, 8), sharex=True)
+        create_spectrogram_plot(events, "Current Analysis", ax1, ax2)
+        plt.tight_layout()
+        chart_path = os.path.join(output_dir, 'segmentation_chart.png')
+        plt.savefig(chart_path, dpi=300, bbox_inches='tight')
+        plt.close(fig)
 
 def perform_initial_analysis(audio_file_path, apnea_threshold_factor=APNEA_THRESHOLD_FACTOR):
     """
