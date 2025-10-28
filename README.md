@@ -12,8 +12,12 @@ All analysis results are saved persistently in a local SQLite database, allowing
 -   **Automatic Phase Detection:** The backend analyzes the audio to identify and segment inhalation, exhalation, and apnea phases.
 -   **Interactive Charting:**
     -   Visualizes the audio signal and an amplitude envelope plot where respiratory phases are clearly marked.
-    -   **Full Interactivity:** Select, merge, or delete detected phase blocks directly on the chart.
+    -   **Full Phase Editing:** Select, merge, **split**, or delete detected phase blocks directly on the chart.
+    -   **Automatic Cycle Re-labeling:** After any edit (split, merge, delete), the entire sequence of phases is automatically re-labeled to enforce the correct `inhalation -> apnea -> exhalation -> apnea` pattern.
     -   All changes instantly update the respiratory cycle table and performance scores.
+-   **Configurable Analysis Parameters:**
+    -   **Real-time Apnea Threshold:** Adjust the apnea detection threshold and instantly recalculate the phase segmentation.
+    -   **Editable Score Metrics:** Open a parameters dialog to change the target values for cycle duration, I/E ratio, and apnea percentage, and instantly recalculate the performance scores.
 -   **Real-Time Analysis & Feedback:**
     -   **Respiratory Cycles Table:** Automatically groups phases into complete respiratory cycles and calculates durations.
     -   **Performance Scores:** Provides scores for **Depth**, **Stability**, and **Internal Balance**, plus a final weighted score.
@@ -21,7 +25,7 @@ All analysis results are saved persistently in a local SQLite database, allowing
 -   **Persistent Storage with SQLite:**
     -   Each analysis session is saved as a record in a local **SQLite database** (`mindfulness_analysis.db`).
     -   Interactive changes made in the UI **update the original database record**, ensuring data integrity and preventing duplicate entries.
--   **Data Export:** For every session, the raw results (cycles table, segmentation chart, and ML-ready JSON) are still saved to the `results/` directory.
+-   **Comprehensive Data Export:** Export results in multiple formats (`PDF`, `CSV`, `Excel`, `PNG`). The PDF report is a multi-page document including analysis graphs, a full summary table, and the calculated performance scores.
 -   **User-Friendly Interface:** Includes a loading indicator during analysis for better user experience.
 
 ## How It Works
