@@ -12,7 +12,7 @@ app = Flask(__name__)
 # --- Configuration ---
 UPLOAD_FOLDER = 'uploads'
 RESULTS_FOLDER = 'results'
-ALLOWED_EXTENSIONS = {'wav'}
+ALLOWED_EXTENSIONS = {'wav', 'mp3'}
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['RESULTS_FOLDER'] = RESULTS_FOLDER
 

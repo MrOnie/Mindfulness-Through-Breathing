@@ -8,6 +8,8 @@ matplotlib.use('Agg')  # Set non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_pdf import PdfPages
+from pydub import AudioSegment
+import io
 
 # --- CONFIGURATION CONSTANTS ---
 APNEA_THRESHOLD_FACTOR = 0.1
@@ -651,6 +653,30 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, respirati
         plt.savefig(chart_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
 
+def _load_audio_file(audio_file_path):
+    """
+    Loads an audio file, converting MP3 to WAV in memory if necessary.
+
+    Args:
+        audio_file_path (str): The path to the audio file.
+
+    Returns:
+        tuple: A tuple containing:
+            - np.ndarray: The audio time series (y).
+            - int: The sampling rate (sr).
+    """
+    if audio_file_path.lower().endswith('.mp3'):
+        # Convert MP3 to WAV in memory to ensure compatibility
+        audio = AudioSegment.from_mp3(audio_file_path)
+        wav_io = io.BytesIO()
+        audio.export(wav_io, format="wav")
+        wav_io.seek(0)
+        y, sr = librosa.load(wav_io, sr=None)
+    else:
+        # Load other formats directly
+        y, sr = librosa.load(audio_file_path, sr=None)
+    return y, sr
+
 def perform_initial_analysis(audio_file_path, apnea_threshold_factor=APNEA_THRESHOLD_FACTOR):
     """
     Main function to analyze the audio. It does not generate visualizations,
@@ -666,7 +692,7 @@ def perform_initial_analysis(audio_file_path, apnea_threshold_factor=APNEA_THRES
             - str: An error message if an error occurred, otherwise None.
     """
     try:
-        y, sr = librosa.load(audio_file_path, sr=None)
+        y, sr = _load_audio_file(audio_file_path)
         filename = os.path.basename(audio_file_path)
         duration = len(y) / sr
 

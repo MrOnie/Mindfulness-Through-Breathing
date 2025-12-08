@@ -480,5 +480,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // as it's always present.
 $('.custom-file-input').on('change', function(event) {
     var inputFile = event.currentTarget;
-    $(inputFile).parent().find('.custom-file-label').html(inputFile.files[0].name);
+    var fileName = inputFile.files.length > 0 ? inputFile.files[0].name : 'Select file';
+    $(inputFile).parent().find('.custom-file-label').html(fileName);
+    $(inputFile).parent().find('.custom-file-label').css('overflow', 'hidden').css('text-overflow', 'ellipsis');
 });
