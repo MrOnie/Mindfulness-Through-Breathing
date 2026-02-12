@@ -163,7 +163,7 @@ def build_respiratory_cycles_table(events):
             })
             
             cycle_num += 1
-            i += 4  # Advance to the next potential cycle
+            i += 4  # Advance to the next potential cycle*
         else:
             i += 1  # Try the next sequence
             
@@ -177,7 +177,7 @@ def build_respiratory_cycles_table(events):
     
     return df_cycles, cycle_events
 
-# --- Respiration Analysis Functions ---
+# --- Respiration Analysis Functions (test) --- 
 
 CONFIG = {
     "TARGET_CYCLE_DURATION": 20.0,  # 12s = 5 RPM, 20s = 3 RPM
@@ -484,7 +484,7 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, respirati
 
     # Define phase colors for consistent visualization
     phase_colors = {
-        'inhalation': 'green',
+        'inhalation': 'violet',
         'exhalation': 'orange', 
         'apnea': 'red'
     }

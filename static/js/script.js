@@ -15,7 +15,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // as the 'loading-overlay' is hidden by default in the CSS.
     // No additional code is needed to hide it after the analysis.
 
-    // --- Start of moved and new JavaScript code ---
     // Check if analysis_data is available (passed from Flask)
     if (typeof analysis_data !== 'undefined' && analysis_data !== null) {
         // Set the value of the recalc input to the factor used in the analysis
@@ -48,8 +47,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const analysisContainer = document.getElementById('analisis-respiracion-container');
 
         // --- Chart & Drawing Configuration ---
-        const phaseColors = { 'inhalation': 'rgba(75, 192, 192, 0.4)', 'exhalation': 'rgba(255, 206, 86, 0.4)', 'apnea': 'rgba(255, 99, 132, 0.4)' };
-        const phaseBorderColors = { 'inhalation': 'rgb(75, 192, 192)', 'exhalation': 'rgb(255, 206, 86)', 'apnea': 'rgb(255, 99, 132)' };
+        const phaseColors = { 'inhalation': 'rgba(211, 70, 178, 0.52)', 'exhalation': 'rgba(255, 206, 86, 0.4)', 'apnea': 'rgba(255, 99, 132, 0.4)' };
+        const phaseBorderColors = { 'inhalation': 'rgb(174, 44, 165)', 'exhalation': 'rgb(255, 206, 86)', 'apnea': 'rgb(255, 99, 132)' };
         const selectedBorderColor = '#007bff';
         const rangeStartBorderColor = '#28a745';
 
@@ -340,7 +339,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let currentZoomLevel = 1;
         const maxZoom = 10;
         const minZoom = 0.1;
-        const ZOOM_AMOUNT = 1.5; // Factor de acercamiento
+        const ZOOM_AMOUNT = 1.5; // Zooming factor
 
         function applyZoomToCharts(center, newZoomLevel) {
             [signalChart, breathingChart].forEach(chart => {
@@ -350,7 +349,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     let newMin = center - (zoomedDuration / 2);
                     let newMax = center + (zoomedDuration / 2);
         
-                    // Ajustar los límites para que no se salgan del rango 0 - duración total
+                    // Adjust the limits - duración total
                     if (newMin < 0) { newMin = 0; newMax = Math.min(zoomedDuration, duration); }
                     else if (newMax > duration) { newMax = duration; newMin = Math.max(0, duration - zoomedDuration); }
         
@@ -362,18 +361,18 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         function handleZoomIn() {
-            // 1. Reutilizar la lógica para detectar la región seleccionada
+            // 1. Detecting selected region: Use selectedPhaseIds to determine if there's an active selection
             const selectedIds = Array.from(selectedPhaseIds);
             let center;
 
             if (selectedIds.length > 0) {
-                // 2. Zoom en Selección: Calcular el punto medio de la selección
+                // 2. Zoom at Selection: Calculate the center of the selected phases
                 const selectedEvents = events.filter(e => selectedIds.includes(e.id));
                 const minStart = Math.min(...selectedEvents.map(e => e.start));
                 const maxEnd = Math.max(...selectedEvents.map(e => e.end));
                 center = (minStart + maxEnd) / 2;
             } else {
-                // 3. Zoom por Defecto: Usar el centro de la vista actual o el cursor de reproducción
+                // 3. Default Zoom: Use the center of the current view or the audio player's current time
                 center = audioPlayer.currentTime || (breathingChart.options.scales.x.min + breathingChart.options.scales.x.max) / 2;
             }
             currentZoomLevel = Math.min(maxZoom, currentZoomLevel * ZOOM_AMOUNT);

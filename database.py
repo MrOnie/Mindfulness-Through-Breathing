@@ -43,7 +43,7 @@ def create_tables():
     
     conn.commit()
     conn.close()
-    print("Database tables checked/created successfully.")
+    print("Database tables checked/created successfully!")
 
 def save_analysis_to_db(session_folder_path, analysis_data, df_table, respiration_analysis, participant_name=None):
     """

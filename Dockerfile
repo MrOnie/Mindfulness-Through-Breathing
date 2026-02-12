@@ -1,28 +1,28 @@
-# 1. Usar una imagen base oficial de Python (basada en Debian)
+# 1. Use an official Python base image (based on Debian)
 FROM python:3.11-slim
 
-# 2. Establecer el directorio de trabajo dentro del contenedor
+# 2. Set the working directory inside the container
 WORKDIR /app
 
-# 3. Instalar dependencias del sistema operativo
-# Actualiza la lista de paquetes e instala ffmpeg.
-# Este es el paso CRUCIAL para que el procesamiento de .mp3 funcione.
+# 3. Install operating system dependencies
+# Update the package list and install ffmpeg.
+# This is the CRUCIAL step for .mp3 processing to work.
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libopus-dev opus-tools && \
-    # Limpiar la caché de apt para mantener la imagen pequeña
+    # Clear apt cache to keep image small
     rm -rf /var/lib/apt/lists/*
 
-# 4. Copiar el archivo de requisitos de Python
+# 4. Copy Python Requirements File
 COPY requirements.txt .
 
-# 5. Instalar las dependencias de Python
+# 5. Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 6. Copiar el resto del código de la aplicación al contenedor
+# 6. Copy the rest of the application code to the container
 COPY . .
 
-# 7. Exponer el puerto en el que se ejecuta la aplicación Flask
+# 7. Expose the port on which the Flask application is running
 EXPOSE 5000
 
-# 8. Comando para ejecutar la aplicación cuando se inicie el contenedor
-# Escucha en 0.0.0.0 para que sea accesible desde fuera del contenedor
+# 8. Command to run the application when the container starts
+# Listen on 0.0.0.0 to make it accessible from outside the container
 CMD ["python", "app.py"]

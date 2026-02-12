@@ -3,19 +3,17 @@ A Docker image based on Python 3.13.5 was created that copies the Flask applicat
 
 Imagen DockerHub: [flask-audio-app](https://hub.docker.com/r/faitarch/flask-audio-app)
 
-
-## Crear Tag Github
-### Crear un tag para la nueva versión
+## Create Tag Github
+### Create a tag for the new version
 ```bash
-# Crear tag (semantic versioning recomendado)
-git tag -a [version] -m "Versión [version] con nuevas funcionalidades"
+# Create tag (semantic versioning recommended)
+git tag -a [version] -m "Version with new features"
 
-# Subir el tag al repositorio
+# Upload the tag to the repository
 git push origin [version]
 ```
 
-
-## Crear Tag DockerHub
+## Create Tag DockerHub
 ### Run the container locally:
 ```bash
 git clone https://github.com/MrOnie/Mindfulness-Through-Breathing.git
@@ -24,12 +22,12 @@ docker build -t faitarch/flask-audio-app:[version] .
 docker run -p 5000:5000 --restart unless-stopped faitarch/flask-audio-app:[version] 
 ```
 
-### Construir la imagen con el nuevo tag
+### Build image with the new tag
 ```bash
-# Construir con tag específico
+# Build with specific tag
 docker build -t faitarch/flask-audio-app:[version] .
 
-# También actualizar latest
+# Update latest
 docker build -t faitarch/flask-audio-app:latest .
 ```
 

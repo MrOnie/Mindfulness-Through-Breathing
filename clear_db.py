@@ -12,11 +12,11 @@ def clear_database():
         conn.commit()
         
         deleted_count = cursor.rowcount
-        print(f"✓ Base de datos vaciada exitosamente.")
-        print(f"  Registros eliminados: {deleted_count}")
+        print(f" Database cleared successfully.")
+        print(f"  Deleted records: {deleted_count}")
         
     except sqlite3.Error as e:
-        print(f"Error al vaciar la base de datos: {e}")
+        print(f"Error: {e}")
     finally:
         if conn:
             conn.close()

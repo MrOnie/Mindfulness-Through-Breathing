@@ -105,17 +105,19 @@ Below is an example of the analysis results from a session.
 
 **Segmentation Chart**
 
-*Note: The image path is an example and may vary based on the session.*
-![Segmentation Chart](results/Test1_24.6.2025-15.58pm_20250821-120950/segmentation_chart.png)
+*Note: The image path is an example and may vary based on the session. The colors could change.*
+![Segmentation Chart](results\Test1_10-junio-4.14-am_20250821-120438\segmentation_chart.png)
 
 **Respiratory Cycles Table**
 
 | Cycle | Inhalation (s) | Apnea 1 (s) | Exhalation (s) | Apnea 2 (s) | Total Cycle (s) |
 |-------|----------------|-------------|----------------|-------------|-----------------|
-| 1     | 11.0           | 14.0        | 14.0           | 12.0        | 51.0            |
-| 2     | 7.0            | 11.0        | 17.0           | 17.0        | 52.0            |
+| 1     | 2.0           | 3.0        | 9.0           | 16.0        | 30.0            |
+| 2     | 3.0            | 11.0        | 9.0           | 8.0        | 31.0            |
 | ...   | ...            | ...         | ...            | ...         | ...             |
-| avg   | 7.8            | 15.8        | 14.8           | 11.4        | 49.8            |
+| avg   | 4.0            | 6.1        | 7.6           | 8.8        | 26.5            |
+
+
 
 **Data for Machine Learning**
 
@@ -123,30 +125,28 @@ For each session, a `segmentation_data.json` file is also generated. This file i
 
 ```json
 {
-    "audio_metadata": {
-        "original_filename": "24.6.2025-15.58pm.wav",
-        "total_duration_seconds": 350.5,
-        "sampling_rate": 22050
-    },
-    "segmentation_events": [
-        {
-            "start_time": 0.0,
-            "end_time": 10.0,
-            "label": "inhalation",
-            "cycle_number": 1
+            "id": "cycle_23",
+            "start": 575,
+            "end": 599,
+            "label": "23",
+            "cycle_number": 23
         },
         {
-            "start_time": 10.0,
-            "end_time": 24.0,
-            "label": "apnea",
-            "cycle_number": 1
+            "id": "cycle_24",
+            "start": 600,
+            "end": 610,
+            "label": "24",
+            "cycle_number": 24
         }
-    ]
+    ],
+    "db_id": 1,
+    "session_folder": "results\\Test1_10-junio-4.14-am_20250821-120438",
+    "audio_filename": "10-junio-4.14-am.wav"
 }
 ```
 
 
-## 🧭 Guías de uso
+## 🧭 Use Guide
 
-- 🔧 [Instalación local](docs/LOCAL_DEPLOYMENT.md)
-- 🚀 [Despliegue en producción con Docker](docs/PRODUCTION_DEPLOYMENT.md)
+- 🔧 [Local Installation](docs/LOCAL_DEPLOYMENT.md)
+- 🚀 [Deploy with Docker](docs/PRODUCTION_DEPLOYMENT.md)
