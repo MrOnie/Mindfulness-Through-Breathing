@@ -10,7 +10,7 @@ def view_all_data():
         conn = sqlite3.connect(DATABASE_FILE)
         cursor = conn.cursor()
 
-        print("--- Querying all analysis sessions ---")
+        print("--- Querying all analysis sessions. ---")
         cursor.execute("SELECT * FROM analysis_sessions ORDER BY analysis_timestamp DESC")
         
         rows = cursor.fetchall()

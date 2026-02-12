@@ -1,11 +1,11 @@
-# Instalación local
+# Local Installation
 
-## Requisitos
-- Python 3.13 o superior
+## Requirements
+- Python 3.13 +
 - pip
-- Virtualenv (opcional pero recomendado)
+- Virtualenv (optional - recommended)
 
-## Comandos para instalar y ejecutar la aplicación localmente
+## Commands for installation and locally excecution
 ```bash
 git clone https://github.com/MrOnie/Mindfulness-Through-Breathing.git
 cd Mindfulness-Through-Breathing
@@ -13,12 +13,12 @@ pip install -r requirements.txt
 python app.py
 ```
 
-## Comandos para instalar y ejecutar la aplicación localmente en un entorno virtual
+## Commands for installation and locally excecution in a venv
 ```bash
 git clone https://github.com/MrOnie/Mindfulness-Through-Breathing.git
 cd Mindfulness-Through-Breathing
-python3 -m venv venv            # En Windows usa `venv\Scripts\python -m venv venv`
-source venv/bin/activate        # En Windows usa `venv\Scripts\activate`
+python3 -m venv venv            # Windows use `venv\Scripts\python -m venv venv`
+source venv/bin/activate        # Windows use `venv\Scripts\activate`
 pip install -r requirements.txt
 python app.py
 ```

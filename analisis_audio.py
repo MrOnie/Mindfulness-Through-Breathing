@@ -3,9 +3,13 @@ import pandas as pd
 import numpy as np
 import os
 import json
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from matplotlib.backends.backend_pdf import PdfPages
+from pydub import AudioSegment
+import io
 
 # --- CONFIGURATION CONSTANTS ---
 APNEA_THRESHOLD_FACTOR = 0.1
@@ -65,10 +69,14 @@ def identify_phase_intervals(apnea_mask, time):
 
         is_apnea = apnea_mask.iloc[start_idx]
         start_time = time.iloc[start_idx]
-        # The end time is the last second of the segment
-        end_time = time.iloc[end_idx - 1] if end_idx > 0 else start_time
+        # The end time is now the start of the next segment, making it exclusive.
+        if end_idx < len(time):
+            end_time = time.iloc[end_idx]
+        else:
+            # For the last segment, the end is the last time point + 1.
+            end_time = time.iloc[-1] + 1
 
-        if end_time >= start_time:
+        if end_time > start_time:
             if is_apnea:
                 details['apnea'].append([start_time, end_time])
             else:
@@ -138,10 +146,10 @@ def build_respiratory_cycles_table(events):
             
             current_cycle = {
                 'Cycle': cycle_num,
-                'Inhalation (s)': e1['end'] - e1['start'] + 1,
-                'Apnea 1 (s)': e2['end'] - e2['start'] + 1,
-                'Exhalation (s)': e3['end'] - e3['start'] + 1,
-                'Apnea 2 (s)': e4['end'] - e4['start'] + 1
+                'Inhalation (s)': e1['end'] - e1['start'],
+                'Apnea 1 (s)': e2['end'] - e2['start'],
+                'Exhalation (s)': e3['end'] - e3['start'],
+                'Apnea 2 (s)': e4['end'] - e4['start']
             }
             current_cycle['Total Cycle (s)'] = sum(list(current_cycle.values())[1:])
             cycles_data.append(current_cycle)
@@ -155,7 +163,7 @@ def build_respiratory_cycles_table(events):
             })
             
             cycle_num += 1
-            i += 4  # Advance to the next potential cycle
+            i += 4  # Advance to the next potential cycle*
         else:
             i += 1  # Try the next sequence
             
@@ -163,18 +171,18 @@ def build_respiratory_cycles_table(events):
         return pd.DataFrame(columns=['Cycle', 'Inhalation (s)', 'Apnea 1 (s)', 'Exhalation (s)', 'Apnea 2 (s)', 'Total Cycle (s)']), []
     
     df_cycles = pd.DataFrame(cycles_data)
-    averages = df_cycles.drop(columns='Cycle').mean().round(1)
+    averages = df_cycles.drop(columns='Cycle').mean().round(2)
     averages['Cycle'] = 'avg'
     df_cycles = pd.concat([df_cycles, pd.DataFrame([averages])], ignore_index=True)
     
     return df_cycles, cycle_events
 
-# --- Respiration Analysis Functions ---
+# --- Respiration Analysis Functions (test) --- 
 
 CONFIG = {
     "TARGET_CYCLE_DURATION": 20.0,  # 12s = 5 RPM, 20s = 3 RPM
-    "TARGET_IE_RATIO": 1.5,   # Exhalation / Inhalation Ratio
-    "TARGET_APNEA_PERCENTAGE": 0.2,   # Percentage of cycle dedicated to apneas
+    "TARGET_IE_RATIO": 3,   # Exhalation / Inhalation Ratio
+    "TARGET_APNEA_PERCENTAGE": 0.5,   # Percentage of cycle dedicated to apneas
     "PILLAR_WEIGHTS": {
         "depth": 0.3,
         "stability": 0.4,
@@ -190,32 +198,34 @@ CONFIG = {
 
 PHASE_COLUMNS = ['Inhalation (s)', 'Apnea 1 (s)', 'Exhalation (s)', 'Apnea 2 (s)']
 
-def calculate_depth_score(df):
+def calculate_depth_score(df, config):
     """
     Calculates the depth score based on the average total cycle duration.
 
     Args:
         df (pd.DataFrame): DataFrame of respiratory cycles (excluding 'avg' row).
+        config (dict): A dictionary containing scoring parameters.
 
     Returns:
         float: The depth score (0-100).
     """
     avg_cycle_duration = df['Total Cycle (s)'].mean()
-    score = min(1.0, avg_cycle_duration / CONFIG["TARGET_CYCLE_DURATION"]) * 100
+    score = min(1.0, avg_cycle_duration / config["TARGET_CYCLE_DURATION"]) * 100
     return score
 
-def calculate_stability_score(df):
+def calculate_stability_score(df, config):
     """
     Calculates the stability score based on the consistency of each phase duration.
 
     Args:
         df (pd.DataFrame): DataFrame of respiratory cycles (excluding 'avg' row).
+        config (dict): A dictionary containing scoring parameters.
 
     Returns:
         float: The weighted average stability score (0-100).
     """
     stability_scores = {}
-    weights = CONFIG["PHASE_STABILITY_WEIGHTS"]
+    weights = config["PHASE_STABILITY_WEIGHTS"]
 
     for phase, col_name in zip(weights.keys(), PHASE_COLUMNS):
         mean_val = df[col_name].mean()
@@ -226,38 +236,40 @@ def calculate_stability_score(df):
     final_weighted_score = sum(weights[phase] * stability_scores[phase] for phase in weights)
     return final_weighted_score
 
-def calculate_balance_score(df):
+def calculate_balance_score(df, config):
     """
     Calculates the internal balance score based on inhalation/exhalation ratio and apnea control.
 
     Args:
         df (pd.DataFrame): DataFrame of respiratory cycles (excluding 'avg' row).
+        config (dict): A dictionary containing scoring parameters.
 
     Returns:
         float: The weighted average internal balance score (0-100).
     """
-    weights = CONFIG["INTERNAL_BALANCE_WEIGHTS"]
+    weights = config["INTERNAL_BALANCE_WEIGHTS"]
 
     mean_inh = df['Inhalation (s)'].mean()
     mean_exh = df['Exhalation (s)'].mean()
     actual_ie_ratio = (mean_exh / mean_inh) if mean_inh > 0 else 0
-    ie_ratio_score = max(0, 1 - abs(actual_ie_ratio - CONFIG["TARGET_IE_RATIO"]) / CONFIG["TARGET_IE_RATIO"]) * 100
+    ie_ratio_score = max(0, 1 - abs(actual_ie_ratio - config["TARGET_IE_RATIO"]) / config["TARGET_IE_RATIO"]) * 100
 
     mean_ap1 = df['Apnea 1 (s)'].mean()
     mean_ap2 = df['Apnea 2 (s)'].mean()
     mean_cycle = df['Total Cycle (s)'].mean()
     actual_apnea_percentage = ((mean_ap1 + mean_ap2) / mean_cycle) if mean_cycle > 0 else 0
-    apnea_control_score = max(0, 1 - abs(actual_apnea_percentage - CONFIG["TARGET_APNEA_PERCENTAGE"]) / CONFIG["TARGET_APNEA_PERCENTAGE"]) * 100
+    apnea_control_score = max(0, 1 - abs(actual_apnea_percentage - config["TARGET_APNEA_PERCENTAGE"]) / config["TARGET_APNEA_PERCENTAGE"]) * 100
 
     final_weighted_score = (weights['ie_ratio'] * ie_ratio_score + weights['apnea_control'] * apnea_control_score)
     return final_weighted_score
 
-def analyze_respiration(df_cycles):
+def analyze_respiration(df_cycles, custom_config=None):
     """
     Analyzes respiratory cycles and provides scores and recommendations.
 
     Args:
         df_cycles (pd.DataFrame): DataFrame of respiratory cycles, including the 'avg' row.
+        custom_config (dict, optional): A dictionary with custom scoring parameters to override defaults.
 
     Returns:
         dict: A dictionary containing scores, number of cycles, weakest pillar, and recommendation,
@@ -266,16 +278,21 @@ def analyze_respiration(df_cycles):
     if df_cycles.empty or 'avg' not in df_cycles['Cycle'].values:
         return None
 
+    # Merge custom config with default config
+    final_config = CONFIG.copy()
+    if custom_config:
+        final_config.update(custom_config)
+
     # Exclude the 'avg' row for score calculations
     df = df_cycles[df_cycles['Cycle'] != 'avg'].copy()
     if df.empty:
         return None
 
-    depth_score = calculate_depth_score(df)
-    stability_score = calculate_stability_score(df)
-    balance_score = calculate_balance_score(df)
+    depth_score = calculate_depth_score(df, final_config)
+    stability_score = calculate_stability_score(df, final_config)
+    balance_score = calculate_balance_score(df, final_config)
 
-    weights = CONFIG["PILLAR_WEIGHTS"]
+    weights = final_config["PILLAR_WEIGHTS"]
     final_score = (weights['depth'] * depth_score +
                    weights['stability'] * stability_score +
                    weights['balance'] * balance_score)
@@ -291,9 +308,9 @@ def analyze_respiration(df_cycles):
     weakest_pillar = min({k: v for k, v in scores.items() if k != 'Final'}, key=scores.get)
     
     recommendations = {
-        "Depth": "Try to breathe slower and deeper.",
+        "Depth": "Try to breathe slower and deeper (breaths per minute).",
         "Stability": "Focus on maintaining a consistent rhythm in each phase.",
-        "Internal Balance": "Work on the structure of your breath (e.g., longer exhalation)."
+        "Internal Balance": "Work on the structure of your breath (e.g., longer exhalation and/or apneas)."
     }
 
     return {
@@ -358,7 +375,7 @@ def calculate_waveshow_data(y, sr, num_vis_points=1000):
     
     return t_wave.tolist(), y_min.tolist(), y_max.tolist()
 
-def save_analysis_results(output_dir, events, df_table, analysis_data, export_format='all'):
+def save_analysis_results(output_dir, events, df_table, analysis_data, respiration_analysis, export_format='all'):
     """
     Saves comprehensive analysis results including original and adjusted spectrograms, 
     detailed reports, and data tables in multiple formats.
@@ -368,6 +385,7 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
         events (list): The list of phase events (current/adjusted).
         df_table (pd.DataFrame): The respiratory cycles table.
         analysis_data (dict): The dictionary with all analysis data.
+        respiration_analysis (dict): The dictionary with respiration analysis scores.
         export_format (str): Export format - 'pdf', 'png', 'csv', 'excel', or 'all'.
     """
     os.makedirs(output_dir, exist_ok=True)
@@ -466,7 +484,7 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
 
     # Define phase colors for consistent visualization
     phase_colors = {
-        'inhalation': 'green',
+        'inhalation': 'violet',
         'exhalation': 'orange', 
         'apnea': 'red'
     }
@@ -550,65 +568,61 @@ def save_analysis_results(output_dir, events, df_table, analysis_data, export_fo
                 pdf.savefig(fig, bbox_inches='tight')
                 plt.close(fig)
 
-            # Page 3: Data Summary
-            fig, ax = plt.subplots(figsize=(12, 8))
-            ax.axis('tight')
-            ax.axis('off')
-            
+            # Page 3: Respiratory Cycles Summary Table
             if has_cycle_data:
-                # Create table display
-                table_data = df_table.values
-                table_headers = df_table.columns.tolist()
+                fig_table, ax_table = plt.subplots(figsize=(11, 8))
+                ax_table.axis('tight')
+                ax_table.axis('off')
                 
-                table = ax.table(cellText=table_data, colLabels=table_headers, 
-                               cellLoc='center', loc='center')
+                table = ax_table.table(cellText=df_table.values, colLabels=df_table.columns, 
+                                       cellLoc='center', loc='center')
                 table.auto_set_font_size(False)
-                table.set_fontsize(9)
+                table.set_fontsize(10)
                 table.scale(1.2, 1.5)
+
+                for (row, col), cell in table.get_celld().items():
+                    if row == 0:
+                        cell.set_facecolor('#4CAF50')
+                        cell.set_text_props(weight='bold', color='white')
                 
-                # Style the table
-                for i, header in enumerate(table_headers):
-                    table[(0, i)].set_facecolor('#4CAF50')
-                    table[(0, i)].set_text_props(weight='bold', color='white')
-                
-                plt.suptitle('Respiratory Cycles Summary Table', fontsize=16, fontweight='bold', y=0.95)
-            else:
-                # Show events summary instead
-                ax.text(0.5, 0.7, 'Insufficient Data for Cycle Analysis', 
-                       transform=ax.transAxes, ha='center', va='center', 
-                       fontsize=16, fontweight='bold')
-                
-                events_text = f"Detected Events:\n"
-                for i, event in enumerate(events[:10]):  # Show first 10 events
-                    events_text += f"• {event['type'].title()}: {event['start']}-{event['end']}s\n"
-                if len(events) > 10:
-                    events_text += f"... and {len(events)-10} more events"
-                
-                ax.text(0.5, 0.5, events_text, transform=ax.transAxes, ha='center', va='center', 
-                       fontsize=12, bbox=dict(boxstyle="round,pad=0.3", facecolor="lightblue", alpha=0.8))
+                plt.suptitle('Respiratory Cycles Summary', fontsize=16, fontweight='bold', y=0.92)
+                pdf.savefig(fig_table, bbox_inches='tight')
+                plt.close(fig_table)
+
+            # Page 4: Analysis Summaries
+            fig_summary, ax_summary = plt.subplots(figsize=(11, 8))
+            ax_summary.axis('off')
             
-            # Add analysis summary text
             summary_text = f"""
-Analysis Summary:
-• Total Duration: {analysis_data.get('duration', 0):.1f} seconds
-• Total Events Detected: {len(events)}
-• Total Breathing Cycles: {len(cycle_events)}
-• Sampling Rate: {analysis_data.get('sampling_rate', 0)} Hz
-• File: {analysis_data.get('filename', 'unknown')}
-
-Phase Color Legend:
-• Green: Inhalation phases
-• Orange: Exhalation phases  
-• Red: Apnea (breath holding) phases
-
-Note: Cycle analysis requires complete breathing patterns (Inhalation→Apnea→Exhalation→Apnea)
+            Analysis Summary:
+            • Total Duration: {analysis_data.get('duration', 0):.1f} seconds
+            • Total Events Detected: {len(events)}
+            • Total Breathing Cycles: {len(cycle_events)}
+            • Sampling Rate: {analysis_data.get('sampling_rate', 0)} Hz
+            • File: {analysis_data.get('filename', 'unknown')}
             """
-            plt.figtext(0.02, 0.02, summary_text, fontsize=10, 
-                       bbox=dict(boxstyle="round,pad=0.3", facecolor="lightgray", alpha=0.8))
+            ax_summary.text(0.05, 0.75, summary_text, transform=ax_summary.transAxes, fontsize=12, 
+                           verticalalignment='top', bbox=dict(boxstyle="round,pad=0.4", facecolor="#f0f0f0", alpha=1))
+
+            if respiration_analysis:
+                scores = respiration_analysis['scores']
+                analysis_text = f"""
+                Respiration Analysis:
+
+                • Final Score: {scores['Final']} / 100
+                • Depth Score: {scores['Depth']} / 100
+                • Stability Score: {scores['Stability']} / 100
+                • Internal Balance: {scores['Internal Balance']} / 100
+
+                • Weakest Pillar: {respiration_analysis['weakest_pillar']}
+                • Recommendation: {respiration_analysis['recommendation']}
+                """
+                ax_summary.text(0.05, 0.5, analysis_text, transform=ax_summary.transAxes, fontsize=12, 
+                               verticalalignment='top', bbox=dict(boxstyle="round,pad=0.4", facecolor="#e6f7ff", alpha=1))
             
-            plt.tight_layout()
-            pdf.savefig(fig, bbox_inches='tight')
-            plt.close(fig)
+            plt.suptitle('Analysis & Respiration Summary', fontsize=16, fontweight='bold', y=0.92)
+            pdf.savefig(fig_summary, bbox_inches='tight')
+            plt.close(fig_summary)
 
     # --- Save Individual PNG Images ---
     if export_format in ['png', 'all']:
@@ -639,13 +653,38 @@ Note: Cycle analysis requires complete breathing patterns (Inhalation→Apnea→
         plt.savefig(chart_path, dpi=300, bbox_inches='tight')
         plt.close(fig)
 
-def perform_initial_analysis(audio_file_path):
+def _load_audio_file(audio_file_path):
+    """
+    Loads an audio file, converting MP3 to WAV in memory if necessary.
+
+    Args:
+        audio_file_path (str): The path to the audio file.
+
+    Returns:
+        tuple: A tuple containing:
+            - np.ndarray: The audio time series (y).
+            - int: The sampling rate (sr).
+    """
+    if audio_file_path.lower().endswith('.mp3'):
+        # Convert MP3 to WAV in memory to ensure compatibility
+        audio = AudioSegment.from_mp3(audio_file_path)
+        wav_io = io.BytesIO()
+        audio.export(wav_io, format="wav")
+        wav_io.seek(0)
+        y, sr = librosa.load(wav_io, sr=None)
+    else:
+        # Load other formats directly
+        y, sr = librosa.load(audio_file_path, sr=None)
+    return y, sr
+
+def perform_initial_analysis(audio_file_path, apnea_threshold_factor=APNEA_THRESHOLD_FACTOR):
     """
     Main function to analyze the audio. It does not generate visualizations,
     only extracts the necessary data for the interface.
 
     Args:
         audio_file_path (str): The absolute path to the audio file.
+        apnea_threshold_factor (float): The factor to determine the apnea detection threshold.
 
     Returns:
         tuple: A tuple containing:
@@ -653,7 +692,7 @@ def perform_initial_analysis(audio_file_path):
             - str: An error message if an error occurred, otherwise None.
     """
     try:
-        y, sr = librosa.load(audio_file_path, sr=None)
+        y, sr = _load_audio_file(audio_file_path)
         filename = os.path.basename(audio_file_path)
         duration = len(y) / sr
 
@@ -668,7 +707,7 @@ def perform_initial_analysis(audio_file_path):
         positive_mean_max = df_envelope['Positive_Mean'].dropna().max()
         negative_mean_min = df_envelope['Negative_Mean'].dropna().min()
         amplitude_max = max(positive_mean_max if pd.notna(positive_mean_max) else 0, abs(negative_mean_min) if pd.notna(negative_mean_min) else 0)
-        apnea_threshold = amplitude_max * APNEA_THRESHOLD_FACTOR
+        apnea_threshold = amplitude_max * apnea_threshold_factor
         
         apnea_mask = (df_envelope['Positive_Mean'].fillna(0) < apnea_threshold) & \
                      (np.abs(df_envelope['Negative_Mean'].fillna(0)) < apnea_threshold)

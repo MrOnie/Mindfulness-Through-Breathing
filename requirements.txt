@@ -1,6 +1,8 @@
-flask
-werkzeug
+Flask
 librosa
 pandas
 numpy
 matplotlib
+pydub
+Werkzeug
+openpyxl

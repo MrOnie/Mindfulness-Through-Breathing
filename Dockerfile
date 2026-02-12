@@ -1,18 +1,28 @@
-# Usa una imagen oficial de Python
-FROM python:3.13.5
+# 1. Use an official Python base image (based on Debian)
+FROM python:3.11-slim
 
-# Establece el directorio de trabajo
+# 2. Set the working directory inside the container
 WORKDIR /app
 
-# Copia e instala dependencias
+# 3. Install operating system dependencies
+# Update the package list and install ffmpeg.
+# This is the CRUCIAL step for .mp3 processing to work.
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg libopus-dev opus-tools && \
+    # Clear apt cache to keep image small
+    rm -rf /var/lib/apt/lists/*
+
+# 4. Copy Python Requirements File
 COPY requirements.txt .
+
+# 5. Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copia todo el contenido del proyecto al contenedor
+# 6. Copy the rest of the application code to the container
 COPY . .
 
-# Exponer el puerto 5000 (Flask lo usa por defecto)
+# 7. Expose the port on which the Flask application is running
 EXPOSE 5000
 
-# Ejecutar la app con el servidor de desarrollo
+# 8. Command to run the application when the container starts
+# Listen on 0.0.0.0 to make it accessible from outside the container
 CMD ["python", "app.py"]

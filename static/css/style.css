@@ -49,7 +49,7 @@ body {
     height: 100%;
     background-color: rgba(255, 255, 255, 0.8);
     z-index: 9999;
-    display: none; /* Hidden by default */
+    display: none;  /*  Hidden by default  */
     justify-content: center;
     align-items: center;
 }
