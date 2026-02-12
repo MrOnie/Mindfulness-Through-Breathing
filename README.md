@@ -1,5 +1,7 @@
 # Mindfulness Through Breathing: Interactive Analysis Tool
 
+[Deployed](http://35.239.174.69/)
+
 This project is a web-based interface for analyzing respiratory patterns from audio recordings. It helps users visualize their breathing, interactively correct detected respiratory phases (inhalation, exhalation, apnea), and receive real-time feedback on their technique based on metrics like depth, stability, and balance.
 
 All analysis results are saved persistently in a local SQLite database, allowing for a durable record of each session.
