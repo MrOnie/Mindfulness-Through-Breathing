@@ -1,6 +1,6 @@
 # Mindfulness Through Breathing: Interactive Analysis Tool
 
-[Deployed](http://34.170.43.142:5000/)
+[Deployed](http://34.27.247.11:5000)
 
 This project is a web-based interface for analyzing respiratory patterns from audio recordings. It helps users visualize their breathing, interactively correct detected respiratory phases (inhalation, exhalation, apnea), and receive real-time feedback on their technique based on metrics like depth, stability, and balance.
 
@@ -153,3 +153,4 @@ For each session, a `segmentation_data.json` file is also generated. This file i
 - 🔧 [Local Installation](docs/LOCAL_DEPLOYMENT.md)
 
 - 🚀 [Deploy with Docker](docs/PRODUCTION_DEPLOYMENT.md)
+
